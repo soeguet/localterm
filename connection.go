@@ -38,27 +38,24 @@ func Connection(app *tview.Application) error {
 
 			switch v := payload.(type) {
 
-			case Payload:
-				// Jetzt kannst du v als Payload verwenden
+			case MessagePayload:
 				AddNewPlainMessageToChatView("Payload: " + v.MessageType.MessageContext)
 			case ClientList:
-				// Jetzt kannst du v als ClientList verwenden
 				AddNewPlainMessageToChatView("ClientList:")
+			case MessageListPayload:
+				for i, _ := range v.MessageList {
+
+					AddNewPlainMessageToChatView(string("henlos" + string(i)))
+
+				}
 			case int:
 				if v == -1 {
-					fmt.Println("Unbekannter Typ")
+					fmt.Println("unknown type")
 				}
 			default:
-				fmt.Println("Unerwarteter Typ")
+				fmt.Println("unknows type")
 			}
 
-			// if payload.PayloadType == 1 {
-			// 	AddNewMessageToChatView(payload)
-			// }
-			//
-			// if payload.PayloadType == 2 {
-			// 	AddNewPlainMessageToChatView(payload)
-			// }
 		}
 	}()
 

@@ -37,7 +37,7 @@ func AddNewPlainMessageToChatView(customMessage string) {
 	chatView.ScrollToEnd()
 }
 
-func AddNewMessageToChatView(payload Payload) {
+func AddNewMessageToChatView(payload MessagePayload) {
 	encodedmessage := DecodeBase64ToString(payload.MessageType.MessageContext)
 	time := payload.MessageType.MessageTime
 	sender := payload.ClientType.ClientDbId

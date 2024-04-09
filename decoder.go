@@ -6,23 +6,6 @@ import (
 	"log"
 )
 
-type ClientType struct {
-	ClientDbId string `json:"clientDbId"`
-}
-
-type MessageType struct {
-	MessageDbId    string `json:"messageDbId"`
-	MessageContext string `json:"messageContext"`
-	MessageTime    string `json:"messageTime"`
-	MessageDate    string `json:"messageDate"`
-}
-
-type Payload struct {
-	PayloadType int         `json:"payloadType"`
-	ClientType  ClientType  `json:"clientType"`
-	MessageType MessageType `json:"messageType"`
-}
-
 func DecodeJson(jsonString []byte) interface{} {
 
 	var basePayload struct {
@@ -34,11 +17,9 @@ func DecodeJson(jsonString []byte) interface{} {
 		log.Fatal(err)
 	}
 
-	AddNewPlainMessageToChatView("PayloadType: " + string(jsonString))
-
 	switch basePayload.PayloadType {
 	case 1:
-		var payload Payload
+		var payload MessagePayload
 		err := json.Unmarshal(jsonString, &payload)
 		if err != nil {
 			log.Fatal(err)
@@ -54,6 +35,12 @@ func DecodeJson(jsonString []byte) interface{} {
 		return payload
 
 	case 4:
+		var payload MessageListPayload
+		err := json.Unmarshal(jsonString, &payload)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return payload
 
 	default:
 		return -1
