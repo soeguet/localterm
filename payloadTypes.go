@@ -27,38 +27,38 @@ package main
  *      }[];
  *    };
  */
-type ClientType struct {
-	ClientDbId string `json:"clientDbId"`
-}
-
-type MessageType struct {
-	MessageDbId    string `json:"messageDbId"`
-	MessageContext string `json:"messageContext"`
-	MessageTime    string `json:"messageTime"`
-	MessageDate    string `json:"messageDate"`
-}
-
-type QuoteType struct {
-	QuoteMessageId      string `json:"quoteMessageId"`
-	QuoteClientId       string `json:"quoteClientId"`
-	QuoteMessageContext string `json:"quoteMessageContext"`
-	QuoteTime           string `json:"quoteTime"`
-	QuoteDate           string `json:"quoteDate"`
-}
-
-type ReactionType struct {
-	ReactionMessageId string `json:"reactionMessageId"`
-	ReactionContext   string `json:"reactionContext"`
-	ReactionClientId  string `json:"reactionClientId"`
-}
-
-type MessagePayload struct {
-	PayloadType  int           `json:"payloadType"`
-	ClientType   ClientType    `json:"clientType"`
-	MessageType  MessageType   `json:"messageType"`
-	QuoteType    *QuoteType    `json:"quoteType"`
-	ReactionType *ReactionType `json:"reactionType"`
-}
+//type ClientType struct {
+//	ClientDbId string `json:"clientDbId"`
+//}
+//
+//type MessageType struct {
+//	MessageDbId    string `json:"messageDbId"`
+//	MessageContext string `json:"messageContext"`
+//	MessageTime    string `json:"messageTime"`
+//	MessageDate    string `json:"messageDate"`
+//}
+//
+//type QuoteType struct {
+//	QuoteMessageId      string `json:"quoteMessageId"`
+//	QuoteClientId       string `json:"quoteClientId"`
+//	QuoteMessageContext string `json:"quoteMessageContext"`
+//	QuoteTime           string `json:"quoteTime"`
+//	QuoteDate           string `json:"quoteDate"`
+//}
+//
+//type ReactionType struct {
+//	ReactionMessageId string `json:"reactionMessageId"`
+//	ReactionContext   string `json:"reactionContext"`
+//	ReactionClientId  string `json:"reactionClientId"`
+//}
+//
+//type MessagePayload struct {
+//	PayloadType  int           `json:"payloadType"`
+//	ClientType   ClientType    `json:"clientType"`
+//	MessageType  MessageType   `json:"messageType"`
+//	QuoteType    *QuoteType    `json:"quoteType"`
+//	ReactionType *ReactionType `json:"reactionType"`
+//}
 
 /**
  * [[ RESULTING TYPE ]]

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 
 	"github.com/gdamore/tcell/v2"
@@ -31,9 +32,25 @@ func createChatView() *tview.TextView {
 	return textView
 }
 
-func AddNewPlainMessageToChatView(customMessage string) {
+func AddNewEncryptedMessageToChatView(customMessage *string) {
 
-	fmt.Fprintf(chatView, " [red]%s\n", customMessage)
+	decodedString, err := base64.StdEncoding.DecodeString(*customMessage)
+	if err != nil {
+		fmt.Println("error decoding base64 string:", err)
+		return
+	}
+	fmt.Fprintf(chatView, " [red]%s\n", decodedString)
+	chatView.ScrollToEnd()
+}
+func AddNewPlainMessageToChatView(customMessage *string) {
+
+	fmt.Fprintf(chatView, " [red]%s\n", *customMessage)
+	chatView.ScrollToEnd()
+}
+
+func AddNewPlainByteToChatView(customMessage *[]byte) {
+
+	fmt.Fprintf(chatView, " [red]%s\n", *customMessage)
 	chatView.ScrollToEnd()
 }
 
@@ -56,7 +73,8 @@ func createInputField() *tview.InputField {
 	inputField.SetDoneFunc(func(key tcell.Key) {
 		if key == tcell.KeyEnter {
 			// addNewMessageToChatView(inputField.GetText())
-			AddNewPlainMessageToChatView(inputField.GetText())
+			var abc = inputField.GetText()
+			AddNewPlainMessageToChatView(&abc)
 			inputField.SetText("")
 		}
 	})
