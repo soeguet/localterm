@@ -16,20 +16,37 @@ func createTextArea() *tview.TextArea {
 }
 
 var (
-	chatView = createChatView()
-	appCopy  *tview.Application
+	chatView *tview.TextView
 )
 
-func createChatView() *tview.TextView {
+func createChatView(app *App) *tview.TextView {
 
 	textView := tview.NewTextView().
 		SetDynamicColors(true).
 		SetScrollable(true).
 		SetChangedFunc(func() {
-			appCopy.Draw()
+			app.ui.Draw()
 		})
 
 	return textView
+}
+
+func AddNewMessageViaMessagePayload(payload *MessagePayload) {
+
+	decodedString := DecodeBase64ToString(payload.MessageType.MessageContext)
+
+	payloadUsername := GetUsernameForId(payload.ClientType.ClientDbId)
+
+	if payloadUsername == "" {
+		payloadUsername = "Unknown"
+	}
+
+	usernameColor := GetClientColor(payload.ClientType.ClientDbId)
+
+	fmt.Fprintf(chatView, " [-]%s - ["+usernameColor+"]%s:[-] %s\n", payload.MessageType.MessageTime, payloadUsername,
+		decodedString)
+
+	chatView.ScrollToEnd()
 }
 
 func AddNewEncryptedMessageToChatView(customMessage *string) {
@@ -42,6 +59,7 @@ func AddNewEncryptedMessageToChatView(customMessage *string) {
 	fmt.Fprintf(chatView, " [red]%s\n", decodedString)
 	chatView.ScrollToEnd()
 }
+
 func AddNewPlainMessageToChatView(customMessage *string) {
 
 	fmt.Fprintf(chatView, " [red]%s\n", *customMessage)
@@ -63,18 +81,17 @@ func AddNewMessageToChatView(payload MessagePayload) {
 	chatView.ScrollToEnd()
 }
 
-func createInputField() *tview.InputField {
+func createInputField(app *App) *tview.InputField {
 
-	// Erstelle das InputField, aber setze SetDoneFunc später
 	inputField := tview.NewInputField().
 		SetLabel("Nachricht: ")
 
-	// Setze nun die Done-Funktion, nachdem inputField bereits definiert ist
 	inputField.SetDoneFunc(func(key tcell.Key) {
 		if key == tcell.KeyEnter {
 			// addNewMessageToChatView(inputField.GetText())
 			var abc = inputField.GetText()
-			AddNewPlainMessageToChatView(&abc)
+			//AddNewPlainMessageToChatView(&abc)
+			sendMessagePayloadToWebsocket(app.conn, &abc)
 			inputField.SetText("")
 		}
 	})
@@ -82,20 +99,20 @@ func createInputField() *tview.InputField {
 	return inputField
 }
 
-func Gui(app *tview.Application) error {
+func Gui(app *App) error {
 
-	appCopy = app
-	inputField := createInputField()
+	chatView = createChatView(app)
+	inputField := createInputField(app)
 
 	flex := tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(chatView, 0, 1, false).
 		AddItem(inputField, 3, 1, true)
 
-	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+	app.ui.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		return event
 	})
 
-	if err := app.SetRoot(flex,
+	if err := app.ui.SetRoot(flex,
 		true).EnableMouse(true).Run(); err != nil {
 		panic(err)
 	}

@@ -5,13 +5,17 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 
 	"github.com/google/uuid"
 )
 
 var (
-	clientList ClientList
-	envVars    = EnvVars{
+	mutex               sync.Mutex
+	clientUsernameCache = make(map[string]string)
+	clientColorCache    = make(map[string]string)
+	clientList          ClientList
+	envVars             = EnvVars{
 		Username: os.Getenv("LOCALCHAT_USERNAME"),
 		IP:       os.Getenv("LOCALCHAT_IP"),
 		Port:     os.Getenv("LOCALCHAT_PORT"),
@@ -37,6 +41,39 @@ type EnvVars struct {
 	Port     string `json:"port"`
 	Os       string `json:"os"`
 	Id       string `json:"id"`
+}
+
+func AddUsernameToCache(clientId string, username string) {
+
+	clientUsernameCache[clientId] = username
+}
+
+func GetUsernameFromCache(clientId string) string {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	return clientUsernameCache[clientId]
+}
+
+func resetUsernameCache() {
+	clientUsernameCache = make(map[string]string)
+}
+
+func SetClientList(newClientList *ClientList) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	clientList.Clients = newClientList.Clients
+	resetUsernameCache()
+	resetColorCache()
+}
+
+func resetColorCache() {
+	clientColorCache = make(map[string]string)
+}
+
+func init() {
+	setClientId()
 }
 
 func setClientId() string {
@@ -80,6 +117,60 @@ func setClientId() string {
 	}
 }
 
-func GetThisClientId() string {
-	return envVars.Id
+func GetClientColor(clientId string) string {
+
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	value, exists := clientColorCache[clientId]
+
+	// if the color is already in the cache, return it; all good
+	if exists {
+		return value
+	}
+
+	// if the color is not in the cache, search for it in the client list and add it to the cache
+	for _, v := range clientList.Clients {
+
+		if v.ClientDbId == clientId {
+			AddClientColorToCache(clientId, v.ClientColor)
+			return v.ClientColor
+		}
+	}
+
+	// if the color is not in the cache and not in the client list, return nil
+	return ""
+}
+
+func AddClientColorToCache(id string, color string) {
+	clientColorCache[id] = color
+}
+
+func GetUsernameForId(clientId string) string {
+
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	value, exists := clientUsernameCache[clientId]
+
+	// if the username is already in the cache, return it; all good
+	if exists {
+		return value
+	}
+
+	// if the username is not in the cache, search for it in the client list and add it to the cache
+	for _, v := range clientList.Clients {
+
+		if v.ClientDbId == clientId {
+			AddUsernameToCache(clientId, v.ClientUsername)
+			return v.ClientUsername
+		}
+	}
+
+	// if the username is not in the cache and not in the client list, return nil
+	return ""
+}
+
+func GetThisClientId() *string {
+	return &envVars.Id
 }

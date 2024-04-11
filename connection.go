@@ -9,107 +9,44 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-
-	"github.com/rivo/tview"
 )
 
-/**
- * [[ RESULTING TYPE ]]
- * export type MessagePayload = {
- *      payloadType: PayloadSubType.message;
- *      messageType: {
- *          messageDbId: string;
- *          messageContext: string;
- *          messageTime: string;
- *          messageDate: Date;
- *      };
- *      clientType: {
- *          clientDbId: string;
- *      };
- *      quoteType?: {
- *          quoteMessageId: string;
- *          quoteClientId: string;
- *          quoteMessageContext: string;
- *          quoteTime: string;
- *          quoteDate: Date;
- *      };
- *      reactionType?: {
- *          reactionMessageId: string;
- *          reactionContext: string;
- *          reactionClientId: string;
- *      }[];
- *    };
- */
-type GenericMessage struct {
-	PayloadType int             `json:"payloadType"`
-	Payload     json.RawMessage `json:"payload"`
-}
-
-type MessagePayload struct {
-	PayloadType  int            `json:"payloadType"`
-	MessageType  MessageType    `json:"messageType"`
-	ClientType   ClientType     `json:"clientType"`
-	QuoteType    QuoteType      `json:"quoteType"`
-	ReactionType []ReactionType `json:"reactionType"`
-}
-
-type MessageType struct {
-	MessageDbId    string `json:"messageDbId"`
-	MessageContext string `json:"messageContext"`
-	MessageTime    string `json:"messageTime"`
-	MessageDate    string `json:"messageDate"`
-}
-
-type ClientType struct {
-	ClientDbId string `json:"clientDbId"`
-}
-
-type QuoteType struct {
-	QuoteMessageId      string `json:"quoteMessageId"`
-	QuoteClientId       string `json:"quoteClientId"`
-	QuoteMessageContext string `json:"quoteMessageContext"`
-	QuoteTime           string `json:"quoteTime"`
-	QuoteDate           string `json:"quoteDate"`
-}
-
-type ReactionType struct {
-	ReactionMessageId string `json:"reactionMessageId"`
-	ReactionContext   string `json:"reactionContext"`
-	ReactionClientId  string `json:"reactionClientId"`
-}
-
-type TypingPayload struct {
-	PayloadType int    `json:"payloadType"`
-	ClientDbId  string `json:"clientDbId"`
-	IsTyping    bool   `json:"isTyping"`
-}
-
-func Connection(app *tview.Application) error {
+func Connection(app *App) error {
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
-	c, _, err := websocket.DefaultDialer.Dial("ws://192.168.178.69:5588/chat", nil)
-	if err != nil {
-		log.Fatal("dial:", err)
-	}
-	defer c.Close()
+	defer func(c *websocket.Conn) {
+		err := c.Close()
+		if err != nil {
+			log.Fatal("close:", err)
+		}
+	}(app.conn)
+
+	// initial request to websocket after handshake
+	// asks for all RegisteredUsers in a clientList
+	authenticateClientAtSocket(app.conn)
 
 	done := make(chan struct{})
 
 	go func() {
+
 		defer close(done)
+
 		for {
-			_, message, err := c.ReadMessage()
+
+			_, message, err := app.conn.ReadMessage()
 			if err != nil {
 				log.Println("read:", err)
 				return
 			}
+
 			var msg GenericMessage
 			if err := json.Unmarshal(message, &msg); err != nil {
 				fmt.Println("Error parsing JSON:", err)
 				return
 			}
+
 			switch msg.PayloadType {
 
 			case 1:
@@ -117,19 +54,40 @@ func Connection(app *tview.Application) error {
 				if err := json.Unmarshal(message, &messagePayload); err != nil {
 					fmt.Println("Error parsing messagePayload:", err)
 				}
-				AddNewEncryptedMessageToChatView(&messagePayload.MessageType.MessageContext)
+				//AddNewEncryptedMessageToChatView(&messagePayload.MessageType.MessageContext)
+				AddNewMessageViaMessagePayload(&messagePayload)
 
-			case 5:
-				var payloadB TypingPayload
-				if err := json.Unmarshal(message, &payloadB); err != nil {
-					fmt.Println("Error parsing typingPayload:", err)
+			case 2:
+				var clientListPayload ClientList
+				if err := json.Unmarshal(message, &clientListPayload); err != nil {
+					fmt.Println("Error parsing clientListPayload:", err)
 				}
-				AddNewPlainMessageToChatView(&payloadB.ClientDbId)
+				SetClientList(&clientListPayload)
+
+			case 4:
+				var messageListPayload MessageListPayload
+
+				if err := json.Unmarshal(message, &messageListPayload); err != nil {
+					fmt.Println("Error parsing messageListPayload:", err)
+				}
+				for _, payload := range messageListPayload.MessageList {
+					AddNewMessageViaMessagePayload(&payload)
+				}
+
+			//case 5:
+			//	var typingPayload TypingPayload
+			//	if err := json.Unmarshal(message, &typingPayload); err != nil {
+			//		fmt.Println("Error parsing typingPayload:", err)
+			//	}
+			//	AddNewPlainMessageToChatView(&typingPayload.ClientDbId)
 
 			default:
-				fmt.Println("Unbekannter payloadType:", msg.PayloadType)
+				fmt.Println("unknown PayloadType", msg.PayloadType)
 			}
+
+			app.ui.Draw()
 		}
+
 	}()
 
 	for {
@@ -140,7 +98,7 @@ func Connection(app *tview.Application) error {
 			log.Println("interrupt")
 
 			// Clean disconnect
-			err := c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+			err := app.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 			if err != nil {
 				log.Println("write close:", err)
 				return nil
@@ -151,5 +109,65 @@ func Connection(app *tview.Application) error {
 			}
 			return nil
 		}
+	}
+}
+
+func sendMessagePayloadToWebsocket(conn *websocket.Conn, message *string) {
+
+	// Send the message
+	messagePayload := MessagePayload{
+		PayloadType: 1,
+		MessageType: MessageType{
+			MessageDbId:    envVars.Id,
+			MessageContext: *message,
+			MessageTime:    time.Now().Format("15:04:05"),
+			MessageDate:    time.Now().Format("2006-01-02"),
+		},
+		ClientType: ClientType{
+			ClientDbId: envVars.Id,
+		},
+	}
+	// TODO base64 encrypt message and solve []byte issue
+	messagePayloadBytes, err := json.Marshal(messagePayload)
+	if err != nil {
+		fmt.Println("Error marshalling messagePayload:", err)
+	}
+	err = conn.WriteMessage(websocket.TextMessage, messagePayloadBytes)
+	if err != nil {
+		fmt.Println("Error writing messagePayload:", err)
+	}
+}
+
+func authenticateClientAtSocket(c *websocket.Conn) {
+
+	// Authenticate the client
+	authenticationPayload := AuthenticationPayload{
+		PayloadType:    0,
+		ClientUsername: envVars.Username,
+		ClientDbId:     envVars.Id,
+	}
+	authenticationPayloadBytes, err := json.Marshal(authenticationPayload)
+	if err != nil {
+		fmt.Println("Error marshalling authenticationPayload:", err)
+	}
+	err = c.WriteMessage(websocket.TextMessage, authenticationPayloadBytes)
+	if err != nil {
+		fmt.Println("Error writing authenticationPayload:", err)
+	}
+}
+
+func requestClientList(c *websocket.Conn) {
+
+	// Get the client list
+	clientListPayload := ClientListRequestPayload{
+		PayloadType: 2,
+	}
+	clientListPayloadBytes, err := json.Marshal(clientListPayload)
+	if err != nil {
+		fmt.Println("Error marshalling clientListPayload:", err)
+	}
+	err = c.WriteMessage(websocket.TextMessage, clientListPayloadBytes)
+	if err != nil {
+		fmt.Println("Error writing clientListPayload:", err)
 	}
 }
