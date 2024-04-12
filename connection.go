@@ -5,32 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math/rand"
 	"os"
 	"os/signal"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
-func generateBase36(n int) string {
-	const charset = "0123456789abcdefghijklmnopqrstuvwxyz"
-	result := make([]byte, n)
-	for i := range result {
-		result[i] = charset[rand.Intn(len(charset))]
-	}
-	return string(result)
-}
-
-func generateSimpleId() string {
-	timestamp := time.Now().UnixMilli()
-	randomPart := generateBase36(7) // 7 Zeichen, um der Länge in Deinem TypeScript-Beispiel zu entsprechen
-	return fmt.Sprintf("id-%d-%s", timestamp, randomPart)
-}
 
 func Connection(app *App) error {
 	interrupt := make(chan os.Signal, 1)
@@ -88,6 +68,9 @@ func Connection(app *App) error {
 				if err := json.Unmarshal(message, &messageListPayload); err != nil {
 					fmt.Println("Error parsing messageListPayload:", err)
 				}
+
+				app.ClearChatView()
+
 				for _, payload := range messageListPayload.MessageList {
 					AddNewMessageViaMessagePayload(&payload)
 				}
@@ -98,6 +81,12 @@ func Connection(app *App) error {
 					fmt.Println("Error parsing typingPayload:", err)
 				}
 				AddNewPlainMessageToChatView(&typingPayload.ClientDbId)
+
+			case 7:
+				// PayloadSubType.reaction == 7
+
+				// need ask for the last 100 messages again, since the messages are not cached locally .. yet
+				retrieveLast100Messages(app.conn)
 
 			default:
 				fmt.Println("unknown PayloadType", msg.PayloadType)
@@ -134,7 +123,7 @@ func sendMessagePayloadToWebsocket(conn *websocket.Conn, message *string) {
 	messagePayload := MessagePayload{
 		PayloadType: 1,
 		MessageType: MessageType{
-			MessageDbId:    generateSimpleId(),
+			MessageDbId:    "TOBEREMOVED",
 			MessageContext: base64.StdEncoding.EncodeToString([]byte(*message)),
 			MessageTime:    time.Now().Format("15:04"),
 			MessageDate:    time.Now().Format("2006-01-02"),

@@ -139,11 +139,11 @@ type GenericMessage struct {
 }
 
 type MessagePayload struct {
-	PayloadType int         `json:"payloadType"`
-	MessageType MessageType `json:"messageType"`
-	ClientType  ClientType  `json:"clientType"`
-	// QuoteType    QuoteType      `json:"quoteType"`
-	// ReactionType []ReactionType `json:"reactionType"`
+	PayloadType  int             `json:"payloadType"`
+	MessageType  MessageType     `json:"messageType"`
+	ClientType   ClientType      `json:"clientType"`
+	QuoteType    *QuoteType      `json:"quoteType"`
+	ReactionType *[]ReactionType `json:"reactionType"`
 }
 
 type MessageType struct {
@@ -190,4 +190,3 @@ type AuthenticationPayload struct {
 	ClientUsername string `json:"clientUsername"`
 	ClientDbId     string `json:"clientDbId"`
 }
-

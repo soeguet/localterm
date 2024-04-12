@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
+	"strings"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -37,16 +38,48 @@ func AddNewMessageViaMessagePayload(payload *MessagePayload) {
 
 	payloadUsername := GetUsernameForId(payload.ClientType.ClientDbId)
 
-	if payloadUsername == "" {
-		payloadUsername = "Unknown"
+	usernameColor := fmt.Sprintf("[%s]", GetClientColor(payload.ClientType.ClientDbId))
+
+	var quote string
+	if payload.QuoteType != nil {
+
+		quote = checkForQuote(*payload.QuoteType)
 	}
 
-	usernameColor := GetClientColor(payload.ClientType.ClientDbId)
+	var reactions string
+	if payload.ReactionType != nil {
+		reactions = checkForReactions(*payload.ReactionType)
+	}
 
-	fmt.Fprintf(chatView, " [-]%s - ["+usernameColor+"]%s:[-] %s\n", payload.MessageType.MessageTime, payloadUsername,
-		decodedString)
+	fmt.Fprintf(chatView, "%s [-]%s - %s%s:[-] %s %s\n", quote, payload.MessageType.MessageTime, usernameColor, payloadUsername, decodedString, reactions)
 
 	chatView.ScrollToEnd()
+}
+
+func checkForQuote(quoteType QuoteType) string {
+
+	if quoteType.QuoteClientId == "" {
+		return ""
+	}
+
+	quoteString := fmt.Sprintf("       [gray]┌ [%s - %s: %s]\n", quoteType.QuoteTime, GetUsernameForId(quoteType.QuoteClientId), DecodeBase64ToString(quoteType.QuoteMessageContext))
+
+	return quoteString
+}
+
+func checkForReactions(reactionType []ReactionType) string {
+	if len(reactionType) == 0 {
+		return ""
+	}
+
+	var reactions strings.Builder
+	reactions.WriteString("\n       [yellow]└ [")
+	for _, reaction := range reactionType {
+		fmt.Fprintf(&reactions, " %s", reaction.ReactionContext)
+	}
+	reactions.WriteString("][-]")
+
+	return reactions.String()
 }
 
 func AddNewEncryptedMessageToChatView(customMessage *string) {
@@ -83,20 +116,24 @@ func AddNewMessageToChatView(payload MessagePayload) {
 
 func createInputField(app *App) *tview.InputField {
 
-	inputField := tview.NewInputField().
-		SetLabel("Nachricht: ")
+	inputField := tview.NewInputField()
+	inputField.SetLabel("Message: ")
+	inputField.SetLabelColor(tcell.ColorGreenYellow)
+	inputField.SetFieldBackgroundColor(tcell.ColorBlueViolet)
 
 	inputField.SetDoneFunc(func(key tcell.Key) {
 		if key == tcell.KeyEnter {
-			// addNewMessageToChatView(inputField.GetText())
-			var abc = inputField.GetText()
-			//AddNewPlainMessageToChatView(&abc)
-			sendMessagePayloadToWebsocket(app.conn, &abc)
+			var textInputField = inputField.GetText()
+			sendMessagePayloadToWebsocket(app.conn, &textInputField)
 			inputField.SetText("")
 		}
 	})
 
 	return inputField
+}
+
+func (app *App) ClearChatView() {
+	chatView.Clear()
 }
 
 func Gui(app *App) error {

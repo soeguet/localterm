@@ -10,6 +10,10 @@ import (
 	"github.com/google/uuid"
 )
 
+func init() {
+	setClientId()
+}
+
 var (
 	mutex               sync.Mutex
 	clientUsernameCache = make(map[string]string)
@@ -72,10 +76,6 @@ func resetColorCache() {
 	clientColorCache = make(map[string]string)
 }
 
-func init() {
-	setClientId()
-}
-
 func setClientId() string {
 
 	// if dev=true environment variable is set, use a random id
@@ -117,6 +117,8 @@ func setClientId() string {
 	}
 }
 
+// GetClientColor returns the color of the client with the given client id
+// return yellow if the client did not choose a color yet
 func GetClientColor(clientId string) string {
 
 	mutex.Lock()
@@ -132,14 +134,14 @@ func GetClientColor(clientId string) string {
 	// if the color is not in the cache, search for it in the client list and add it to the cache
 	for _, v := range clientList.Clients {
 
-		if v.ClientDbId == clientId {
+		if v.ClientDbId == clientId && v.ClientColor != "" {
 			AddClientColorToCache(clientId, v.ClientColor)
 			return v.ClientColor
 		}
 	}
 
 	// if the color is not in the cache and not in the client list, return nil
-	return ""
+	return "yellow"
 }
 
 func AddClientColorToCache(id string, color string) {
@@ -167,8 +169,8 @@ func GetUsernameForId(clientId string) string {
 		}
 	}
 
-	// if the username is not in the cache and not in the client list, return nil
-	return ""
+	// if the username is not in the cache and not in the client list, return "Unknown"
+	return "Unknown"
 }
 
 func GetThisClientId() *string {
