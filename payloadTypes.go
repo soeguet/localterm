@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+
 	"github.com/gorilla/websocket"
 	"github.com/rivo/tview"
 )
@@ -138,11 +139,11 @@ type GenericMessage struct {
 }
 
 type MessagePayload struct {
-	PayloadType  int            `json:"payloadType"`
-	MessageType  MessageType    `json:"messageType"`
-	ClientType   ClientType     `json:"clientType"`
-	QuoteType    QuoteType      `json:"quoteType"`
-	ReactionType []ReactionType `json:"reactionType"`
+	PayloadType int         `json:"payloadType"`
+	MessageType MessageType `json:"messageType"`
+	ClientType  ClientType  `json:"clientType"`
+	// QuoteType    QuoteType      `json:"quoteType"`
+	// ReactionType []ReactionType `json:"reactionType"`
 }
 
 type MessageType struct {
@@ -154,6 +155,10 @@ type MessageType struct {
 
 type ClientType struct {
 	ClientDbId string `json:"clientDbId"`
+}
+
+type MessageListRequestPayload struct {
+	PayloadType int `json:"payloadType"`
 }
 
 type ClientListRequestPayload struct {
@@ -185,3 +190,4 @@ type AuthenticationPayload struct {
 	ClientUsername string `json:"clientUsername"`
 	ClientDbId     string `json:"clientDbId"`
 }
+

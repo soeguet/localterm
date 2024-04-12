@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/gorilla/websocket"
 	"log"
+
+	"github.com/gorilla/websocket"
 
 	"github.com/rivo/tview"
 )
@@ -14,6 +15,12 @@ func NewApp(ui *tview.Application, localChatIp string, localChatPort string) (*A
 	if err != nil {
 		return nil, err
 	}
+
+	// initial request to websocket after handshake
+	// asks for all RegisteredUsers in a clientList
+	authenticateClientAtSocket(conn)
+	// retrieveLast100Messages(conn)
+
 	return &App{
 		ui:   ui,
 		conn: conn,
@@ -21,13 +28,11 @@ func NewApp(ui *tview.Application, localChatIp string, localChatPort string) (*A
 }
 
 func main() {
-
 	ui := tview.NewApplication()
 	localChatIp := envVars.IP
 	localChatPort := envVars.Port
 
 	app, err := NewApp(ui, localChatIp, localChatPort)
-
 	if err != nil {
 		log.Fatalf("Failed to initialize app: %v", err)
 	}
@@ -37,10 +42,10 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-
 	}()
 
 	if err := Gui(app); err != nil {
 		log.Fatal(err)
 	}
 }
+

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"os/signal"
 	"time"
@@ -11,8 +13,26 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-func Connection(app *App) error {
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
+func generateBase36(n int) string {
+	const charset = "0123456789abcdefghijklmnopqrstuvwxyz"
+	result := make([]byte, n)
+	for i := range result {
+		result[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(result)
+}
+
+func generateSimpleId() string {
+	timestamp := time.Now().UnixMilli()
+	randomPart := generateBase36(7) // 7 Zeichen, um der Länge in Deinem TypeScript-Beispiel zu entsprechen
+	return fmt.Sprintf("id-%d-%s", timestamp, randomPart)
+}
+
+func Connection(app *App) error {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
@@ -23,14 +43,9 @@ func Connection(app *App) error {
 		}
 	}(app.conn)
 
-	// initial request to websocket after handshake
-	// asks for all RegisteredUsers in a clientList
-	authenticateClientAtSocket(app.conn)
-
 	done := make(chan struct{})
 
 	go func() {
-
 		defer close(done)
 
 		for {
@@ -54,7 +69,7 @@ func Connection(app *App) error {
 				if err := json.Unmarshal(message, &messagePayload); err != nil {
 					fmt.Println("Error parsing messagePayload:", err)
 				}
-				//AddNewEncryptedMessageToChatView(&messagePayload.MessageType.MessageContext)
+				// AddNewEncryptedMessageToChatView(&messagePayload.MessageType.MessageContext)
 				AddNewMessageViaMessagePayload(&messagePayload)
 
 			case 2:
@@ -63,6 +78,9 @@ func Connection(app *App) error {
 					fmt.Println("Error parsing clientListPayload:", err)
 				}
 				SetClientList(&clientListPayload)
+
+				// request the last 100 messages AFTER the client list is received, otherwise race condition // TODO fix this
+				retrieveLast100Messages(app.conn)
 
 			case 4:
 				var messageListPayload MessageListPayload
@@ -74,12 +92,12 @@ func Connection(app *App) error {
 					AddNewMessageViaMessagePayload(&payload)
 				}
 
-			//case 5:
-			//	var typingPayload TypingPayload
-			//	if err := json.Unmarshal(message, &typingPayload); err != nil {
-			//		fmt.Println("Error parsing typingPayload:", err)
-			//	}
-			//	AddNewPlainMessageToChatView(&typingPayload.ClientDbId)
+			case 5:
+				var typingPayload TypingPayload
+				if err := json.Unmarshal(message, &typingPayload); err != nil {
+					fmt.Println("Error parsing typingPayload:", err)
+				}
+				AddNewPlainMessageToChatView(&typingPayload.ClientDbId)
 
 			default:
 				fmt.Println("unknown PayloadType", msg.PayloadType)
@@ -87,7 +105,6 @@ func Connection(app *App) error {
 
 			app.ui.Draw()
 		}
-
 	}()
 
 	for {
@@ -113,33 +130,47 @@ func Connection(app *App) error {
 }
 
 func sendMessagePayloadToWebsocket(conn *websocket.Conn, message *string) {
-
 	// Send the message
 	messagePayload := MessagePayload{
 		PayloadType: 1,
 		MessageType: MessageType{
-			MessageDbId:    envVars.Id,
-			MessageContext: *message,
-			MessageTime:    time.Now().Format("15:04:05"),
+			MessageDbId:    generateSimpleId(),
+			MessageContext: base64.StdEncoding.EncodeToString([]byte(*message)),
+			MessageTime:    time.Now().Format("15:04"),
 			MessageDate:    time.Now().Format("2006-01-02"),
 		},
 		ClientType: ClientType{
 			ClientDbId: envVars.Id,
 		},
 	}
-	// TODO base64 encrypt message and solve []byte issue
-	messagePayloadBytes, err := json.Marshal(messagePayload)
-	if err != nil {
-		fmt.Println("Error marshalling messagePayload:", err)
-	}
-	err = conn.WriteMessage(websocket.TextMessage, messagePayloadBytes)
+
+	err := conn.WriteJSON(messagePayload)
 	if err != nil {
 		fmt.Println("Error writing messagePayload:", err)
 	}
 }
 
-func authenticateClientAtSocket(c *websocket.Conn) {
+func retrieveLast100Messages(c *websocket.Conn) {
+	// Get the last 100 messages
+	messageListPayload := MessageListRequestPayload{
+		PayloadType: 4,
+	}
+	err := c.WriteJSON(messageListPayload)
+	if err != nil {
+		fmt.Println("Error writing messageListPayload:", err)
+	}
 
+	// messageListPayloadBytes, err := json.Marshal(messageListPayload)
+	// if err != nil {
+	// 	fmt.Println("Error marshalling messageListPayload:", err)
+	// }
+	// err = c.WriteMessage(websocket.TextMessage, messageListPayloadBytes)
+	// if err != nil {
+	// 	fmt.Println("Error writing messageListPayload:", err)
+	// }
+}
+
+func authenticateClientAtSocket(c *websocket.Conn) {
 	// Authenticate the client
 	authenticationPayload := AuthenticationPayload{
 		PayloadType:    0,
@@ -157,7 +188,6 @@ func authenticateClientAtSocket(c *websocket.Conn) {
 }
 
 func requestClientList(c *websocket.Conn) {
-
 	// Get the client list
 	clientListPayload := ClientListRequestPayload{
 		PayloadType: 2,

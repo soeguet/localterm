@@ -62,7 +62,7 @@ func AddNewEncryptedMessageToChatView(customMessage *string) {
 
 func AddNewPlainMessageToChatView(customMessage *string) {
 
-	fmt.Fprintf(chatView, " [red]%s\n", *customMessage)
+	fmt.Fprintf(chatView, " [yellow]%s\n", "asd")
 	chatView.ScrollToEnd()
 }
 

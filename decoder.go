@@ -3,11 +3,20 @@ package main
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log"
+	"math/rand"
+	"time"
 )
 
-func DecodeJson(jsonString []byte) interface{} {
+func GenerateSimpleId() string {
+	randomPart := rand.Int63()
+	randomString := fmt.Sprintf("%x", randomPart)
 
+	return fmt.Sprintf("id-%d-%s", time.Now().UnixMilli(), randomString[:6])
+}
+
+func DecodeJson(jsonString []byte) interface{} {
 	var basePayload struct {
 		PayloadType int `json:"payloadType"`
 	}
@@ -54,3 +63,4 @@ func DecodeBase64ToString(encodedString string) string {
 	}
 	return string(decoded)
 }
+
