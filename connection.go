@@ -49,8 +49,10 @@ func Connection(app *App) error {
 				if err := json.Unmarshal(message, &messagePayload); err != nil {
 					fmt.Println("Error parsing messagePayload:", err)
 				}
+
 				// AddNewEncryptedMessageToChatView(&messagePayload.MessageType.MessageContext)
-				AddNewMessageViaMessagePayload(&messagePayload)
+				var index = appendMessageToCache(messagePayload)
+				AddNewMessageViaMessagePayload(&index, &messagePayload)
 
 			case 2:
 				var clientListPayload ClientList
@@ -72,7 +74,9 @@ func Connection(app *App) error {
 				app.ClearChatView()
 
 				for _, payload := range messageListPayload.MessageList {
-					AddNewMessageViaMessagePayload(&payload)
+
+					var index = appendMessageToCache(payload)
+					AddNewMessageViaMessagePayload(&index, &payload)
 				}
 
 			case 5:
@@ -85,7 +89,7 @@ func Connection(app *App) error {
 			case 7:
 				// PayloadSubType.reaction == 7
 
-				// need ask for the last 100 messages again, since the messages are not cached locally .. yet
+				// needs ask for the last 100 messages again, since the messages are not cached locally… yet
 				retrieveLast100Messages(app.conn)
 
 			default:
@@ -148,15 +152,6 @@ func retrieveLast100Messages(c *websocket.Conn) {
 	if err != nil {
 		fmt.Println("Error writing messageListPayload:", err)
 	}
-
-	// messageListPayloadBytes, err := json.Marshal(messageListPayload)
-	// if err != nil {
-	// 	fmt.Println("Error marshalling messageListPayload:", err)
-	// }
-	// err = c.WriteMessage(websocket.TextMessage, messageListPayloadBytes)
-	// if err != nil {
-	// 	fmt.Println("Error writing messageListPayload:", err)
-	// }
 }
 
 func authenticateClientAtSocket(c *websocket.Conn) {

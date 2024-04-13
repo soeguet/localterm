@@ -18,6 +18,7 @@ var (
 	mutex               sync.Mutex
 	clientUsernameCache = make(map[string]string)
 	clientColorCache    = make(map[string]string)
+	messageCache        = make(map[uint16]MessagePayload)
 	clientList          ClientList
 	envVars             = EnvVars{
 		Username: os.Getenv("LOCALCHAT_USERNAME"),
@@ -45,6 +46,17 @@ type EnvVars struct {
 	Port     string `json:"port"`
 	Os       string `json:"os"`
 	Id       string `json:"id"`
+}
+
+func appendMessageToCache(message MessagePayload) (index uint16) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	cacheSize := len(messageCache)
+	index = uint16(cacheSize)
+	messageCache[index] = message
+
+	return
 }
 
 func AddUsernameToCache(clientId string, username string) {
