@@ -179,6 +179,14 @@ type ReactionType struct {
 	ReactionClientId  string `json:"reactionClientId"`
 }
 
+type ReactionPayload struct {
+	PayloadType       int    `json:"payloadType"`
+	ReactionDbId      string `json:"reactionDbId"`
+	ReactionMessageId string `json:"reactionMessageId"`
+	ReactionContext   string `json:"reactionContext"`
+	ReactionClientId  string `json:"reactionClientId"`
+}
+
 type TypingPayload struct {
 	PayloadType int    `json:"payloadType"`
 	ClientDbId  string `json:"clientDbId"`

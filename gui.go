@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 
 	"github.com/gdamore/tcell/v2"
@@ -163,6 +164,7 @@ func createInputField(app *App) *tview.InputField {
 				sendQuotedMessagePayloadToWebsocket(app.conn, &textInputField)
 			// quote
 			case 2:
+				sendReactionPayloadToWebsocket(app.conn, &textInputField)
 			// reaction
 			default:
 				// plain message
@@ -173,6 +175,31 @@ func createInputField(app *App) *tview.InputField {
 	})
 
 	return inputField
+}
+
+func sendReactionPayloadToWebsocket(conn *websocket.Conn, message *string) {
+
+	// schema: [000] >>
+
+	// grab characters in brackets
+	trimmedMessageIndex := (*message)[1:4]
+	reactedMessagePayload := GetMessageFromCache(atoi(trimmedMessageIndex))
+	// remove the first 8 characters
+	trimmedMessage := (*message)[8:]
+
+	reactionPayload := ReactionPayload{
+		PayloadType:       7,
+		ReactionDbId:      uuid.New().String(),
+		ReactionMessageId: reactedMessagePayload.MessageType.MessageDbId,
+		ReactionContext:   trimmedMessage,
+		ReactionClientId:  envVars.Id,
+	}
+
+	err := conn.WriteJSON(reactionPayload)
+	if err != nil {
+		fmt.Println("Error writing messagePayload:", err)
+	}
+
 }
 
 func sendQuotedMessagePayloadToWebsocket(conn *websocket.Conn, message *string) {

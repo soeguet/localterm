@@ -89,7 +89,7 @@ func Connection(app *App) error {
 			case 7:
 				// PayloadSubType.reaction == 7
 
-				// needs ask for the last 100 messages again, since the messages are not cached locally… yet
+				// needs ask for the last 100 messages again, since the cached messages are not updated yet
 				retrieveLast100Messages(app.conn)
 
 			default:
