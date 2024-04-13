@@ -17,8 +17,7 @@ func main() {
 	}
 
 	go func() {
-		err := Connection(app)
-		if err != nil {
+		if err := Connection(app); err != nil {
 			log.Fatal(err)
 		}
 	}()

@@ -84,7 +84,7 @@ func Connection(app *App) error {
 				if err := json.Unmarshal(message, &typingPayload); err != nil {
 					fmt.Println("Error parsing typingPayload:", err)
 				}
-				AddNewPlainMessageToChatView(&typingPayload.ClientDbId)
+				// AddNewPlainMessageToChatView(&typingPayload.ClientDbId)
 
 			case 7:
 				// PayloadSubType.reaction == 7

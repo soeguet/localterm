@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gorilla/websocket"
 
@@ -26,7 +29,6 @@ func NewApp(ui *tview.Application, localChatIp string, localChatPort string) (*A
 	// initial request to websocket after handshake
 	// asks for all RegisteredUsers in a clientList
 	authenticateClientAtSocket(conn)
-	// retrieveLast100Messages(conn)
 
 	return &App{
 		ui:   ui,
@@ -46,7 +48,7 @@ func createChatView(app *App) *tview.TextView {
 	return textView
 }
 
-func AddNewMessageViaMessagePayload(index *uint16, payload *MessagePayload) {
+func AddNewMessageViaMessagePayload(index *int, payload *MessagePayload) {
 
 	messageIndex := fmt.Sprintf("[gray][%03d][-]", *index)
 	decodedString := DecodeBase64ToString(payload.MessageType.MessageContext)
@@ -109,10 +111,26 @@ func checkForReactions(reactionType []ReactionType) string {
 	return reactions.String()
 }
 
-func AddNewPlainMessageToChatView(customMessage *string) {
+func evalTextInChatView(text string) int {
 
-	fmt.Fprintf(chatView, " [yellow]%s\n", "asd")
-	chatView.ScrollToEnd()
+	regexPattern := `^\[([0-9]{3})\] (>{1,2}) `
+	re := regexp.MustCompile(regexPattern)
+
+	matches := re.FindStringSubmatch(text)
+	if matches != nil {
+		switch matches[2] {
+		case ">":
+			// quote
+			return 1
+		case ">>":
+			// reaction
+			return 2
+		default:
+			return 0
+		}
+	} else {
+		return 0
+	}
 }
 
 func createInputField(app *App) *tview.InputField {
@@ -122,23 +140,16 @@ func createInputField(app *App) *tview.InputField {
 	inputField.SetLabelColor(tcell.ColorGreenYellow)
 	inputField.SetFieldBackgroundColor(tcell.ColorBlueViolet)
 
-	regexPattern := `^\[([0-9]{3})\] (>{1,2}) `
-	re := regexp.MustCompile(regexPattern)
-
 	inputField.SetChangedFunc(func(text string) {
-		matches := re.FindStringSubmatch(text)
-		if matches != nil {
-			switch matches[2] {
-			case ">":
-				// quote
-				inputField.SetFieldTextColor(tcell.ColorDarkOrange)
-			case ">>":
-				// reaction
-				inputField.SetFieldTextColor(tcell.ColorGreen)
-			default:
-				inputField.SetFieldTextColor(tcell.ColorWhite)
-			}
-		} else {
+		textCase := evalTextInChatView(text)
+		switch textCase {
+		case 1:
+			// quote
+			inputField.SetFieldTextColor(tcell.ColorDarkOrange)
+		case 2:
+			// reaction
+			inputField.SetFieldTextColor(tcell.ColorGreen)
+		default:
 			inputField.SetFieldTextColor(tcell.ColorWhite)
 		}
 	})
@@ -146,12 +157,69 @@ func createInputField(app *App) *tview.InputField {
 	inputField.SetDoneFunc(func(key tcell.Key) {
 		if key == tcell.KeyEnter {
 			textInputField := inputField.GetText()
-			sendMessagePayloadToWebsocket(app.conn, &textInputField)
+			textCase := evalTextInChatView(textInputField)
+			switch textCase {
+			case 1:
+				sendQuotedMessagePayloadToWebsocket(app.conn, &textInputField)
+			// quote
+			case 2:
+			// reaction
+			default:
+				// plain message
+				sendMessagePayloadToWebsocket(app.conn, &textInputField)
+			}
 			inputField.SetText("")
 		}
 	})
 
 	return inputField
+}
+
+func sendQuotedMessagePayloadToWebsocket(conn *websocket.Conn, message *string) {
+
+	// schema: [000] >
+
+	// grab characters in brackets
+	trimmedMessageIndex := (*message)[1:4]
+	quotedMessagePayload := GetMessageFromCache(atoi(trimmedMessageIndex))
+	// remove the first 7 characters
+	trimmedMessage := (*message)[7:]
+
+	messagePayload := MessagePayload{
+		PayloadType: 1,
+		MessageType: MessageType{
+			MessageDbId:    "TOBEREMOVED",
+			MessageContext: base64.StdEncoding.EncodeToString([]byte(trimmedMessage)),
+			MessageTime:    time.Now().Format("15:04"),
+			MessageDate:    time.Now().Format("2006-01-02"),
+		},
+		ClientType: ClientType{
+			ClientDbId: envVars.Id,
+		},
+		QuoteType: &QuoteType{
+			QuoteDbId:           quotedMessagePayload.MessageType.MessageDbId,
+			QuoteClientId:       quotedMessagePayload.ClientType.ClientDbId,
+			QuoteMessageContext: quotedMessagePayload.MessageType.MessageContext,
+			QuoteTime:           quotedMessagePayload.MessageType.MessageTime,
+			QuoteDate:           quotedMessagePayload.MessageType.MessageDate,
+		},
+		ReactionType: nil,
+	}
+
+	err := conn.WriteJSON(messagePayload)
+	if err != nil {
+		fmt.Println("Error writing messagePayload:", err)
+	}
+}
+
+func atoi(index string) int {
+
+	i, err := strconv.Atoi(index)
+	if err != nil {
+		return 0
+	}
+
+	return i
 }
 
 func (app *App) ClearChatView() {
