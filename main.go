@@ -8,6 +8,7 @@ import (
 
 func main() {
 	ui := tview.NewApplication()
+
 	localChatIp := envVars.IP
 	localChatPort := envVars.Port
 
@@ -28,4 +29,3 @@ func main() {
 		log.Fatal(err)
 	}
 }
-

@@ -17,7 +17,9 @@ import (
 
 var (
 	chatView *tview.TextView
+	flex     tview.Flex
 	margin   = "            "
+	// modal    tview.Modal
 )
 
 func NewApp(ui *tview.Application, localChatIp string, localChatPort string) (*App, error) {
@@ -237,6 +239,16 @@ func createInputField(app *App) *tview.InputField {
 		}
 	})
 
+	// inputField.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+	// 	if event.Key() == tcell.KeyF1 {
+	// 		fmt.Println("F1 pressed")
+	// 		app.ui.SetFocus(modal)
+	//
+	// 		return nil
+	// 	}
+	// 	return event
+	// })
+
 	return inputField
 }
 
@@ -442,20 +454,46 @@ func (app *App) ClearChatView() {
 	chatView.Clear()
 }
 
-func Gui(app *App) error {
-	chatView = createChatView(app)
-	inputField := createInputField(app)
-
+func createFlex(app *App) tview.Flex {
 	flex := tview.NewFlex()
+	inputField := createInputField(app)
 	flex.SetDirection(tview.FlexRow)
 	flex.AddItem(chatView, 0, 1, false)
 	flex.AddItem(inputField, 3, 1, true)
+
+	return *flex
+}
+
+// func createModal(app *App) tview.Modal {
+// 	modal := tview.NewModal().
+// 		SetText("Do you want to quit the application?").
+// 		AddButtons([]string{"Quit", "Cancel"}).
+// 		SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+// 		}).
+// 		SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+//
+// 			if event.Key() == tcell.KeyEsc {
+// 				err := app.ui.SetFocus(&flex)
+// 				if err != nil {
+// 					return nil
+// 				}
+// 			}
+// 			return event
+// 		})
+//
+// 	return modal
+// }
+
+func Gui(app *App) error {
+	chatView = createChatView(app)
+	flex = createFlex(app)
+	// modal = createModal(app)
 
 	app.ui.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		return event
 	})
 
-	if err := app.ui.SetRoot(flex,
+	if err := app.ui.SetRoot(&flex,
 		true).EnableMouse(true).Run(); err != nil {
 		panic(err)
 	}
