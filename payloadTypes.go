@@ -198,3 +198,27 @@ type AuthenticationPayload struct {
 	ClientUsername string `json:"clientUsername"`
 	ClientDbId     string `json:"clientDbId"`
 }
+
+/**
+ * [[ RESULTING TYPE ]]
+ *  export type ClientUpdatePayload = {
+ *     payloadType: PayloadSubType.auth;
+ *     clientDbId: string;
+ *     clientUsername: string;
+ *     clientColor?: string;
+ *     clientProfileImage?: string;
+ *  };
+ *
+ *  @param {PayloadSubType} payloadType
+ *  @param {string} clientDbId
+ *  @param {string} clientUsername
+ *  @param {string} clientColor
+ *  @param {string} clientProfileImage
+ */
+type ClientUpdatePayload struct {
+	PayloadType        int    `json:"payloadType"`
+	ClientDbId         string `json:"clientDbId"`
+	ClientUsername     string `json:"clientUsername"`
+	ClientColor        string `json:"clientColor"`
+	ClientProfileImage string `json:"clientProfileImage"`
+}

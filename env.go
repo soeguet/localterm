@@ -20,6 +20,7 @@ var (
 	clientColorCache    = make(map[string]string)
 	messageCache        = make(map[int]MessagePayload)
 	clientList          ClientList
+	thisClient          Client
 	envVars             = EnvVars{
 		Username: os.Getenv("LOCALCHAT_USERNAME"),
 		IP:       os.Getenv("LOCALCHAT_IP"),
@@ -48,6 +49,16 @@ type EnvVars struct {
 	Id       string `json:"id"`
 }
 
+func GetThisClient() Client {
+	return thisClient
+}
+
+func ResetMessageCache() {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	messageCache = make(map[int]MessagePayload)
+}
 func appendMessageToCache(message MessagePayload) (index int) {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -67,7 +78,6 @@ func GetMessageFromCache(index int) MessagePayload {
 }
 
 func AddUsernameToCache(clientId string, username string) {
-
 	clientUsernameCache[clientId] = username
 }
 
@@ -89,6 +99,16 @@ func SetClientList(newClientList *ClientList) {
 	clientList.Clients = newClientList.Clients
 	resetUsernameCache()
 	resetColorCache()
+	cacheThisClient()
+}
+
+func cacheThisClient() {
+	for _, v := range clientList.Clients {
+		if v.ClientDbId == envVars.Id {
+			thisClient = v
+			return
+		}
+	}
 }
 
 func resetColorCache() {
@@ -96,7 +116,6 @@ func resetColorCache() {
 }
 
 func setClientId() string {
-
 	// if dev=true environment variable is set, use a random id
 	if os.Getenv("DEV") == "true" {
 		return uuid.New().String()
@@ -109,7 +128,7 @@ func setClientId() string {
 
 	idFilePath := filepath.Join(homeDir, ".localchat", "id", "id.txt")
 
-	if err := os.MkdirAll(filepath.Dir(idFilePath), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(idFilePath), 0o700); err != nil {
 		log.Fatalf("error creating folder: %v", err)
 	}
 
@@ -118,7 +137,7 @@ func setClientId() string {
 		newID := uuid.New().String()
 
 		// save id in file
-		if err := os.WriteFile(idFilePath, []byte(newID), 0600); err != nil {
+		if err := os.WriteFile(idFilePath, []byte(newID), 0o600); err != nil {
 			log.Fatalf("error saving the id: %v", err)
 		}
 
@@ -139,7 +158,6 @@ func setClientId() string {
 // GetClientColor returns the color of the client with the given client id
 // return yellow if the client did not choose a color yet
 func GetClientColor(clientId string) string {
-
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -152,7 +170,6 @@ func GetClientColor(clientId string) string {
 
 	// if the color is not in the cache, search for it in the client list and add it to the cache
 	for _, v := range clientList.Clients {
-
 		if v.ClientDbId == clientId && v.ClientColor != "" {
 			AddClientColorToCache(clientId, v.ClientColor)
 			return v.ClientColor
@@ -168,7 +185,6 @@ func AddClientColorToCache(id string, color string) {
 }
 
 func GetUsernameForId(clientId string) string {
-
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -181,7 +197,6 @@ func GetUsernameForId(clientId string) string {
 
 	// if the username is not in the cache, search for it in the client list and add it to the cache
 	for _, v := range clientList.Clients {
-
 		if v.ClientDbId == clientId {
 			AddUsernameToCache(clientId, v.ClientUsername)
 			return v.ClientUsername

@@ -51,7 +51,7 @@ func Connection(app *App) error {
 				}
 
 				// AddNewEncryptedMessageToChatView(&messagePayload.MessageType.MessageContext)
-				var index = appendMessageToCache(messagePayload)
+				index := appendMessageToCache(messagePayload)
 				AddNewMessageViaMessagePayload(&index, &messagePayload)
 
 			case 2:
@@ -71,11 +71,12 @@ func Connection(app *App) error {
 					fmt.Println("Error parsing messageListPayload:", err)
 				}
 
+				ResetMessageCache()
 				app.ClearChatView()
 
 				for _, payload := range messageListPayload.MessageList {
 
-					var index = appendMessageToCache(payload)
+					index := appendMessageToCache(payload)
 					AddNewMessageViaMessagePayload(&index, &payload)
 				}
 

@@ -38,7 +38,6 @@ func NewApp(ui *tview.Application, localChatIp string, localChatPort string) (*A
 }
 
 func createChatView(app *App) *tview.TextView {
-
 	textView := tview.NewTextView().
 		SetDynamicColors(true).
 		SetScrollable(true).
@@ -50,7 +49,6 @@ func createChatView(app *App) *tview.TextView {
 }
 
 func AddNewMessageViaMessagePayload(index *int, payload *MessagePayload) {
-
 	messageIndex := fmt.Sprintf("[gray][%03d][-]", *index)
 	decodedString := DecodeBase64ToString(payload.MessageType.MessageContext)
 
@@ -60,7 +58,6 @@ func AddNewMessageViaMessagePayload(index *int, payload *MessagePayload) {
 
 	var quote string
 	if payload.QuoteType != nil {
-
 		quote = checkForQuote(*payload.QuoteType)
 	}
 
@@ -73,7 +70,6 @@ func AddNewMessageViaMessagePayload(index *int, payload *MessagePayload) {
 		payload.MessageType.MessageTime,
 		usernameColor,
 		payloadUsername, decodedString, reactions)
-
 	if err != nil {
 		fmt.Println("Error writing to chatView:", err)
 	}
@@ -82,7 +78,6 @@ func AddNewMessageViaMessagePayload(index *int, payload *MessagePayload) {
 }
 
 func checkForQuote(quoteType QuoteType) string {
-
 	if quoteType.QuoteClientId == "" {
 		return ""
 	}
@@ -114,7 +109,6 @@ func checkForReactions(reactionType []ReactionType) string {
 
 // checks for [000] > or [000] >> in the message
 func evalTextInChatView(text string) int {
-
 	regexPattern := `^\[([0-9]{3})\] (>{1,2}) `
 	re := regexp.MustCompile(regexPattern)
 
@@ -140,7 +134,6 @@ func evalTextInChatView(text string) int {
 // The input field's field text color is set based on the evaluation of the input text using evalTextInChatView.
 // It returns the created input field.
 func createInputField(app *App) *tview.InputField {
-
 	inputField := tview.NewInputField()
 	inputField.SetLabel("Message: ")
 	inputField.SetLabelColor(tcell.ColorGreenYellow)
@@ -183,13 +176,6 @@ func createInputField(app *App) *tview.InputField {
 
 			// check for [000] > or [000] >> in the message
 			textCase := evalTextInChatView(textInput)
-			if textCase == 0 {
-				textCase = evalTextInChatViewV2(textInput)
-			}
-
-			if textCase == 0 {
-				textCase = evalTextInChatViewV3(textInput)
-			}
 
 			if textCase != 0 {
 				switch textCase {
@@ -199,13 +185,13 @@ func createInputField(app *App) *tview.InputField {
 				case 2:
 					// reaction
 					sendReactionPayloadToWebsocket(app.conn, &textInput)
-				case 3:
-					// settings change
-					sendProfileUpdateToWebsocket(app.conn, &textInput)
 				default:
 					// plain message
 					sendMessagePayloadToWebsocket(app.conn, &textInput)
 				}
+
+				inputField.SetText("")
+				return
 			}
 
 			// check for /q or /r followed by three digits and a space
@@ -222,8 +208,31 @@ func createInputField(app *App) *tview.InputField {
 					// plain message
 					sendMessagePayloadToWebsocket(app.conn, &textInput)
 				}
+				inputField.SetText("")
+				return
 			}
 
+			textCaseV3 := evalTextInChatViewV3(textInput)
+
+			if textCaseV3 != 0 {
+				switch textCaseV3 {
+				case 4:
+					// settings change
+					sendProfileUpdateToWebsocket(app.conn, &textInput)
+				case 5:
+				// settings change
+				default:
+					// plain message
+					sendMessagePayloadToWebsocket(app.conn, &textInput)
+
+					inputField.SetText("")
+
+				}
+				inputField.SetText("")
+				return
+			}
+
+			sendMessagePayloadToWebsocket(app.conn, &textInput)
 			inputField.SetText("")
 		}
 	})
@@ -232,28 +241,41 @@ func createInputField(app *App) *tview.InputField {
 }
 
 func sendProfileUpdateToWebsocket(conn *websocket.Conn, message *string) {
+	// schema: /sc
 
-	// schema: /s:
+	// remove the first 4 characters
+	trimmedMessage := (*message)[4:]
 
-	// grab characters in brackets
-	trimmedMessageIndex := (*message)[1:4]
-	reactedMessagePayload := GetMessageFromCache(atoi(trimmedMessageIndex))
-	// remove the first 8 characters
-	trimmedMessage := (*message)[8:]
+	checkIfTrimmedMessageIsAHexColor := checkIfHexColor(trimmedMessage)
 
-	reactionPayload := ReactionPayload{
-		PayloadType:       7,
-		ReactionDbId:      uuid.New().String(),
-		ReactionMessageId: reactedMessagePayload.MessageType.MessageDbId,
-		ReactionContext:   trimmedMessage,
-		ReactionClientId:  envVars.Id,
+	thisClient := GetThisClient()
+
+	if checkIfTrimmedMessageIsAHexColor {
+		profileUpdatePayload := ClientUpdatePayload{
+			PayloadType:        3,
+			ClientDbId:         thisClient.ClientDbId,
+			ClientColor:        trimmedMessage,
+			ClientUsername:     thisClient.ClientUsername,
+			ClientProfileImage: thisClient.ClientProfileImage,
+		}
+
+		err := conn.WriteJSON(profileUpdatePayload)
+		if err != nil {
+			fmt.Println("Error writing messagePayload:", err)
+		}
 	}
+}
 
-	err := conn.WriteJSON(reactionPayload)
-	if err != nil {
-		fmt.Println("Error writing messagePayload:", err)
+func checkIfHexColor(trimmedMessage string) bool {
+	regexPattern := `^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$`
+	re := regexp.MustCompile(regexPattern)
+
+	matches := re.FindStringSubmatch(trimmedMessage)
+	if matches != nil {
+		return true
+	} else {
+		return false
 	}
-
 }
 
 // checks for /q or /r followed by three digits and a space
@@ -278,7 +300,7 @@ func evalTextInChatViewV2(text string) int {
 
 // checks for /s followed by three digits and a space
 func evalTextInChatViewV3(text string) int {
-	regexPattern := `^/s[n,c]: `
+	regexPattern := `^/s[n,c] `
 	re := regexp.MustCompile(regexPattern)
 
 	matches := re.FindStringSubmatch(text)
@@ -288,14 +310,14 @@ func evalTextInChatViewV3(text string) int {
 		return 0
 	}
 }
-func sendReactionPayloadToWebsocketV2(conn *websocket.Conn, message *string) {
 
+func sendReactionPayloadToWebsocketV2(conn *websocket.Conn, message *string) {
 	// schema: /r005
 
 	// grab characters in brackets
 	trimmedMessageIndex := (*message)[2:5]
 	reactedMessagePayload := GetMessageFromCache(atoi(trimmedMessageIndex))
-	// remove the first 6 characters
+	// remove the first 5 characters
 	trimmedMessage := (*message)[6:]
 
 	reactionPayload := ReactionPayload{
@@ -310,10 +332,9 @@ func sendReactionPayloadToWebsocketV2(conn *websocket.Conn, message *string) {
 	if err != nil {
 		fmt.Println("Error writing messagePayload:", err)
 	}
-
 }
-func sendReactionPayloadToWebsocket(conn *websocket.Conn, message *string) {
 
+func sendReactionPayloadToWebsocket(conn *websocket.Conn, message *string) {
 	// schema: [000] >>
 
 	// grab characters in brackets
@@ -334,11 +355,9 @@ func sendReactionPayloadToWebsocket(conn *websocket.Conn, message *string) {
 	if err != nil {
 		fmt.Println("Error writing messagePayload:", err)
 	}
-
 }
 
 func sendQuotedMessagePayloadToWebsocketV2(conn *websocket.Conn, message *string) {
-
 	// schema: /q000
 
 	// grab characters in brackets
@@ -373,8 +392,8 @@ func sendQuotedMessagePayloadToWebsocketV2(conn *websocket.Conn, message *string
 		fmt.Println("Error writing messagePayload:", err)
 	}
 }
-func sendQuotedMessagePayloadToWebsocket(conn *websocket.Conn, message *string) {
 
+func sendQuotedMessagePayloadToWebsocket(conn *websocket.Conn, message *string) {
 	// schema: [000] >
 
 	// grab characters in brackets
@@ -411,7 +430,6 @@ func sendQuotedMessagePayloadToWebsocket(conn *websocket.Conn, message *string) 
 }
 
 func atoi(index string) int {
-
 	i, err := strconv.Atoi(index)
 	if err != nil {
 		return 0
@@ -425,7 +443,6 @@ func (app *App) ClearChatView() {
 }
 
 func Gui(app *App) error {
-
 	chatView = createChatView(app)
 	inputField := createInputField(app)
 
