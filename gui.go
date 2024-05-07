@@ -15,28 +15,25 @@ import (
 	"github.com/rivo/tview"
 )
 
+const (
+	margin = "            "
+)
+
 var (
 	chatView *tview.TextView
 	flex     tview.Flex
-	margin   = "            "
-	// modal    tview.Modal
 )
 
-func NewApp(ui *tview.Application, localChatIp string, localChatPort string) (*App, error) {
-	url := fmt.Sprintf("ws://%s:%s/chat", localChatIp, localChatPort)
-	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
-	if err != nil {
-		return nil, err
-	}
+func newApp(ui *tview.Application, conn *websocket.Conn) (*App, error) {
 
 	// initial request to websocket after handshake
 	// asks for all RegisteredUsers in a clientList
-	authenticateClientAtSocket(conn)
+	err := authenticateClientAtSocket(conn)
 
 	return &App{
 		ui:   ui,
 		conn: conn,
-	}, nil
+	}, err
 }
 
 func createChatView(app *App) *tview.TextView {
@@ -50,13 +47,16 @@ func createChatView(app *App) *tview.TextView {
 	return textView
 }
 
-func AddNewMessageViaMessagePayload(index *int, payload *MessagePayload) {
+func addNewMessageViaMessagePayload(index *int, payload *MessagePayload) {
 	messageIndex := fmt.Sprintf("[gray][%03d][-]", *index)
-	decodedString := DecodeBase64ToString(payload.MessageType.MessageContext)
+	decodedString, err := decodeBase64ToString(payload.MessageType.MessageContext)
+	if err != nil {
+		fmt.Println("Error decoding base64 to string:", err)
+	}
 
-	payloadUsername := GetUsernameForId(payload.ClientType.ClientDbId)
+	payloadUsername := getUsernameForId(payload.ClientType.ClientDbId)
 
-	usernameColor := fmt.Sprintf("[%s]", GetClientColor(payload.ClientType.ClientDbId))
+	usernameColor := fmt.Sprintf("[%s]", getClientColor(payload.ClientType.ClientDbId))
 
 	var quote string
 	if payload.QuoteType != nil {
@@ -68,7 +68,7 @@ func AddNewMessageViaMessagePayload(index *int, payload *MessagePayload) {
 		reactions = checkForReactions(*payload.ReactionType)
 	}
 
-	_, err := fmt.Fprintf(chatView, "%s%s [-]%s - %s%s:[-] %s %s\n", quote, messageIndex,
+	_, err = fmt.Fprintf(chatView, "%s%s [-]%s - %s%s:[-] %s %s\n", quote, messageIndex,
 		payload.MessageType.MessageTime,
 		usernameColor,
 		payloadUsername, decodedString, reactions)
@@ -84,12 +84,23 @@ func checkForQuote(quoteType QuoteType) string {
 		return ""
 	}
 
+	msg, err := decodeBase64ToString(quoteType.QuoteMessageContext)
+	if err != nil {
+		fmt.Println("Error decoding base64 to string:", err)
+	}
+
 	quoteString := fmt.Sprintf("%s[#997275]┌ [%s - %s: %s]\n", margin, quoteType.QuoteTime,
-		GetUsernameForId(quoteType.QuoteClientId), DecodeBase64ToString(quoteType.QuoteMessageContext))
+		getUsernameForId(quoteType.QuoteClientId), msg)
 
 	return quoteString
 }
 
+// checkForReactions checks for reactions in a given list of reaction types and returns a formatted string representing the reactions.
+// If the input is empty, it returns an empty string. The reactions are formatted as "[#8B8000]└ [<reaction1> <reaction2> ...][-]".
+// The 'margin' constant represents the indentation for the formatted string.
+// The 'ReactionType' struct defines the structure of a reaction and is not included in this documentation.
+// The function uses the 'strings.Builder' type to build the formatted string efficiently.
+// Returns the formatted string representing the reactions or an empty string if an error occurs.
 func checkForReactions(reactionType []ReactionType) string {
 	if len(reactionType) == 0 {
 		return ""
@@ -260,7 +271,7 @@ func sendProfileUpdateToWebsocket(conn *websocket.Conn, message *string) {
 
 	checkIfTrimmedMessageIsAHexColor := checkIfHexColor(trimmedMessage)
 
-	thisClient := GetThisClient()
+	thisClient := getThisClient()
 
 	if checkIfTrimmedMessageIsAHexColor {
 		profileUpdatePayload := ClientUpdatePayload{
@@ -328,7 +339,7 @@ func sendReactionPayloadToWebsocketV2(conn *websocket.Conn, message *string) {
 
 	// grab characters in brackets
 	trimmedMessageIndex := (*message)[2:5]
-	reactedMessagePayload := GetMessageFromCache(atoi(trimmedMessageIndex))
+	reactedMessagePayload := getMessageFromCache(atoi(trimmedMessageIndex))
 	// remove the first 5 characters
 	trimmedMessage := (*message)[6:]
 
@@ -351,7 +362,7 @@ func sendReactionPayloadToWebsocket(conn *websocket.Conn, message *string) {
 
 	// grab characters in brackets
 	trimmedMessageIndex := (*message)[1:4]
-	reactedMessagePayload := GetMessageFromCache(atoi(trimmedMessageIndex))
+	reactedMessagePayload := getMessageFromCache(atoi(trimmedMessageIndex))
 	// remove the first 8 characters
 	trimmedMessage := (*message)[8:]
 
@@ -374,7 +385,7 @@ func sendQuotedMessagePayloadToWebsocketV2(conn *websocket.Conn, message *string
 
 	// grab characters in brackets
 	trimmedMessageIndex := (*message)[2:5]
-	quotedMessagePayload := GetMessageFromCache(atoi(trimmedMessageIndex))
+	quotedMessagePayload := getMessageFromCache(atoi(trimmedMessageIndex))
 	// remove the first 5 characters
 	trimmedMessage := (*message)[5:]
 
@@ -410,7 +421,7 @@ func sendQuotedMessagePayloadToWebsocket(conn *websocket.Conn, message *string) 
 
 	// grab characters in brackets
 	trimmedMessageIndex := (*message)[1:4]
-	quotedMessagePayload := GetMessageFromCache(atoi(trimmedMessageIndex))
+	quotedMessagePayload := getMessageFromCache(atoi(trimmedMessageIndex))
 	// remove the first 7 characters
 	trimmedMessage := (*message)[7:]
 
@@ -450,7 +461,7 @@ func atoi(index string) int {
 	return i
 }
 
-func (app *App) ClearChatView() {
+func (app *App) clearChatView() {
 	chatView.Clear()
 }
 
@@ -484,7 +495,7 @@ func createFlex(app *App) tview.Flex {
 // 	return modal
 // }
 
-func Gui(app *App) error {
+func gui(app *App) error {
 	chatView = createChatView(app)
 	flex = createFlex(app)
 	// modal = createModal(app)

@@ -12,108 +12,86 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-func Connection(app *App) error {
+func handlePayload(message []byte, app *App) {
+	var msg GenericMessage
+	if err := json.Unmarshal(message, &msg); err != nil {
+		fmt.Println("Error parsing JSON:", err)
+		return
+	}
+	switch msg.PayloadType {
+	case 1:
+		var messagePayload MessagePayload
+		if err := json.Unmarshal(message, &messagePayload); err != nil {
+			fmt.Println("Error parsing messagePayload:", err)
+		}
+		index := appendMessageToCache(messagePayload)
+		addNewMessageViaMessagePayload(&index, &messagePayload)
+	case 2:
+		var clientListPayload ClientList
+		if err := json.Unmarshal(message, &clientListPayload); err != nil {
+			fmt.Println("Error parsing clientListPayload:", err)
+		}
+		setClientList(&clientListPayload)
+		retrieveLast100Messages(app.conn)
+	case 4:
+		var messageListPayload MessageListPayload
+		if err := json.Unmarshal(message, &messageListPayload); err != nil {
+			fmt.Println("Error parsing messageListPayload:", err)
+		}
+		resetMessageCache()
+		app.clearChatView()
+		for _, payload := range messageListPayload.MessageList {
+			index := appendMessageToCache(payload)
+			addNewMessageViaMessagePayload(&index, &payload)
+		}
+	case 5:
+		var typingPayload TypingPayload
+		if err := json.Unmarshal(message, &typingPayload); err != nil {
+			fmt.Println("Error parsing typingPayload:", err)
+		}
+	case 7:
+		retrieveLast100Messages(app.conn)
+	default:
+		fmt.Println("unknown PayloadType", msg.PayloadType)
+	}
+	app.ui.Draw()
+}
+
+func connection(app *App) error {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
-
 	defer func(c *websocket.Conn) {
 		err := c.Close()
 		if err != nil {
 			log.Fatal("close:", err)
 		}
 	}(app.conn)
-
 	done := make(chan struct{})
-
 	go func() {
 		defer close(done)
-
 		for {
-
 			_, message, err := app.conn.ReadMessage()
 			if err != nil {
 				log.Println("read:", err)
 				return
 			}
 
-			var msg GenericMessage
-			if err := json.Unmarshal(message, &msg); err != nil {
-				fmt.Println("Error parsing JSON:", err)
-				return
-			}
-
-			switch msg.PayloadType {
-
-			case 1:
-				var messagePayload MessagePayload
-				if err := json.Unmarshal(message, &messagePayload); err != nil {
-					fmt.Println("Error parsing messagePayload:", err)
-				}
-
-				// AddNewEncryptedMessageToChatView(&messagePayload.MessageType.MessageContext)
-				index := appendMessageToCache(messagePayload)
-				AddNewMessageViaMessagePayload(&index, &messagePayload)
-
-			case 2:
-				var clientListPayload ClientList
-				if err := json.Unmarshal(message, &clientListPayload); err != nil {
-					fmt.Println("Error parsing clientListPayload:", err)
-				}
-				SetClientList(&clientListPayload)
-
-				// request the last 100 messages AFTER the client list is received, otherwise race condition // TODO fix this
-				retrieveLast100Messages(app.conn)
-
-			case 4:
-				var messageListPayload MessageListPayload
-
-				if err := json.Unmarshal(message, &messageListPayload); err != nil {
-					fmt.Println("Error parsing messageListPayload:", err)
-				}
-
-				ResetMessageCache()
-				app.ClearChatView()
-
-				for _, payload := range messageListPayload.MessageList {
-
-					index := appendMessageToCache(payload)
-					AddNewMessageViaMessagePayload(&index, &payload)
-				}
-
-			case 5:
-				var typingPayload TypingPayload
-				if err := json.Unmarshal(message, &typingPayload); err != nil {
-					fmt.Println("Error parsing typingPayload:", err)
-				}
-				// AddNewPlainMessageToChatView(&typingPayload.ClientDbId)
-
-			case 7:
-				// PayloadSubType.reaction == 7
-
-				// needs ask for the last 100 messages again, since the cached messages are not updated yet
-				retrieveLast100Messages(app.conn)
-
-			default:
-				fmt.Println("unknown PayloadType", msg.PayloadType)
-			}
-
-			app.ui.Draw()
+			handlePayload(message, app)
 		}
 	}()
-
 	for {
 		select {
 		case <-done:
 			return nil
 		case <-interrupt:
 			log.Println("interrupt")
-
 			// Clean disconnect
 			err := app.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 			if err != nil {
 				log.Println("write close:", err)
 				return nil
 			}
+			// Wait for the server to close the connection after sending the close message
 			select {
 			case <-done:
 			case <-time.After(time.Second):
@@ -155,34 +133,35 @@ func retrieveLast100Messages(c *websocket.Conn) {
 	}
 }
 
-func authenticateClientAtSocket(c *websocket.Conn) {
-	// Authenticate the client
-	authenticationPayload := AuthenticationPayload{
-		PayloadType:    0,
-		ClientUsername: envVars.Username,
-		ClientDbId:     envVars.Id,
-	}
-	authenticationPayloadBytes, err := json.Marshal(authenticationPayload)
+func authenticateClientAtSocket(c *websocket.Conn) error {
+	authenticationPayloadBytes, err := getAuthenticationPayloadBytes()
 	if err != nil {
-		fmt.Println("Error marshalling authenticationPayload:", err)
+		return fmt.Errorf("error marshalling authenticationPayload: %v", err)
 	}
-	err = c.WriteMessage(websocket.TextMessage, authenticationPayloadBytes)
-	if err != nil {
-		fmt.Println("Error writing authenticationPayload:", err)
+
+	writeError := func(err error) error {
+		if err != nil {
+			return fmt.Errorf("error writing authenticationPayload: %v", err)
+		}
+		return nil
 	}
+	return writeError(c.WriteMessage(websocket.TextMessage, authenticationPayloadBytes))
 }
 
-func requestClientList(c *websocket.Conn) {
-	// Get the client list
-	clientListPayload := ClientListRequestPayload{
-		PayloadType: 2,
+func getAuthenticationPayloadBytes() ([]byte, error) {
+	authenticationPayload := AuthenticationPayload{
+		PayloadType:    0,
+		ClientUsername: getEnvUsername(),
+		ClientDbId:     envVars.Id,
 	}
-	clientListPayloadBytes, err := json.Marshal(clientListPayload)
+	return json.Marshal(authenticationPayload)
+}
+
+func createConnection(localChatIp string, localChatPort string) (*websocket.Conn, error) {
+	url := fmt.Sprintf("ws://%s:%s/chat", localChatIp, localChatPort)
+	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
 	if err != nil {
-		fmt.Println("Error marshalling clientListPayload:", err)
+		return nil, err
 	}
-	err = c.WriteMessage(websocket.TextMessage, clientListPayloadBytes)
-	if err != nil {
-		fmt.Println("Error writing clientListPayload:", err)
-	}
+	return conn, nil
 }

@@ -49,11 +49,32 @@ type EnvVars struct {
 	Id       string `json:"id"`
 }
 
-func GetThisClient() Client {
+func getEnvUsername() string {
+	if envVars.Username == "" {
+		return "Unknown"
+	}
+	return envVars.Username
+}
+
+func getEnvIP() string {
+	if envVars.IP == "" {
+		return "localhost"
+	}
+	return envVars.IP
+}
+
+func getEnvPort() string {
+	if envVars.Port == "" {
+		return "8080"
+	}
+	return envVars.Port
+}
+
+func getThisClient() Client {
 	return thisClient
 }
 
-func ResetMessageCache() {
+func resetMessageCache() {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -70,18 +91,18 @@ func appendMessageToCache(message MessagePayload) (index int) {
 	return
 }
 
-func GetMessageFromCache(index int) MessagePayload {
+func getMessageFromCache(index int) MessagePayload {
 	mutex.Lock()
 	defer mutex.Unlock()
 
 	return messageCache[index]
 }
 
-func AddUsernameToCache(clientId string, username string) {
+func addUsernameToCache(clientId string, username string) {
 	clientUsernameCache[clientId] = username
 }
 
-func GetUsernameFromCache(clientId string) string {
+func getUsernameFromCache(clientId string) string {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -92,7 +113,7 @@ func resetUsernameCache() {
 	clientUsernameCache = make(map[string]string)
 }
 
-func SetClientList(newClientList *ClientList) {
+func setClientList(newClientList *ClientList) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -155,9 +176,9 @@ func setClientId() string {
 	}
 }
 
-// GetClientColor returns the color of the client with the given client id
+// getClientColor returns the color of the client with the given client id
 // return yellow if the client did not choose a color yet
-func GetClientColor(clientId string) string {
+func getClientColor(clientId string) string {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -171,7 +192,7 @@ func GetClientColor(clientId string) string {
 	// if the color is not in the cache, search for it in the client list and add it to the cache
 	for _, v := range clientList.Clients {
 		if v.ClientDbId == clientId && v.ClientColor != "" {
-			AddClientColorToCache(clientId, v.ClientColor)
+			addClientColorToCache(clientId, v.ClientColor)
 			return v.ClientColor
 		}
 	}
@@ -180,11 +201,11 @@ func GetClientColor(clientId string) string {
 	return "yellow"
 }
 
-func AddClientColorToCache(id string, color string) {
+func addClientColorToCache(id string, color string) {
 	clientColorCache[id] = color
 }
 
-func GetUsernameForId(clientId string) string {
+func getUsernameForId(clientId string) string {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -198,7 +219,7 @@ func GetUsernameForId(clientId string) string {
 	// if the username is not in the cache, search for it in the client list and add it to the cache
 	for _, v := range clientList.Clients {
 		if v.ClientDbId == clientId {
-			AddUsernameToCache(clientId, v.ClientUsername)
+			addUsernameToCache(clientId, v.ClientUsername)
 			return v.ClientUsername
 		}
 	}
@@ -207,6 +228,6 @@ func GetUsernameForId(clientId string) string {
 	return "Unknown"
 }
 
-func GetThisClientId() *string {
+func getThisClientId() *string {
 	return &envVars.Id
 }
