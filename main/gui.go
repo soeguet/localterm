@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gdamore/tcell/v2"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 
-	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
 
@@ -31,8 +31,9 @@ func newApp(ui *tview.Application, conn *websocket.Conn) (*App, error) {
 	err := authenticateClientAtSocket(conn)
 
 	return &App{
-		ui:   ui,
-		conn: conn,
+		ui:       ui,
+		notifier: &BeeepNotifier{},
+		conn:     conn,
 	}, err
 }
 
@@ -47,7 +48,7 @@ func createChatView(app *App) *tview.TextView {
 	return textView
 }
 
-func addNewMessageViaMessagePayload(index *int, payload *MessagePayload) {
+func addNewMessageToScrollPanel(index *int, payload *MessagePayload) {
 	messageIndex := fmt.Sprintf("[gray][%03d][-]", *index)
 	decodedString, err := decodeBase64ToString(payload.MessageType.MessageContext)
 	if err != nil {
@@ -68,11 +69,10 @@ func addNewMessageViaMessagePayload(index *int, payload *MessagePayload) {
 		reactions = checkForReactions(*payload.ReactionType)
 	}
 
-	_, err = fmt.Fprintf(chatView, "%s%s [-]%s - %s%s:[-] %s %s\n", quote, messageIndex,
+	if _, err = fmt.Fprintf(chatView, "%s%s [-]%s - %s%s:[-] %s %s\n", quote, messageIndex,
 		payload.MessageType.MessageTime,
 		usernameColor,
-		payloadUsername, decodedString, reactions)
-	if err != nil {
+		payloadUsername, decodedString, reactions); err != nil {
 		fmt.Println("Error writing to chatView:", err)
 	}
 

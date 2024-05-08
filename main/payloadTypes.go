@@ -8,22 +8,23 @@ import (
 )
 
 type App struct {
-	ui   *tview.Application
-	conn *websocket.Conn
+	ui       *tview.Application
+	notifier Notifier
+	conn     *websocket.Conn
 }
 
 type MessageListPayload struct {
-	PayloadType int              `json:"payloadType"`
+	PayloadType PayloadType      `json:"payloadType"`
 	MessageList []MessagePayload `json:"messageList"`
 }
 
 type GenericMessage struct {
-	PayloadType int             `json:"payloadType"`
+	PayloadType PayloadType     `json:"payloadType"`
 	Payload     json.RawMessage `json:"payload"`
 }
 
 type MessagePayload struct {
-	PayloadType  int             `json:"payloadType"`
+	PayloadType  PayloadType     `json:"payloadType"`
 	MessageType  MessageType     `json:"messageType"`
 	ClientType   ClientType      `json:"clientType"`
 	QuoteType    *QuoteType      `json:"quoteType"`
@@ -42,11 +43,11 @@ type ClientType struct {
 }
 
 type MessageListRequestPayload struct {
-	PayloadType int `json:"payloadType"`
+	PayloadType PayloadType `json:"payloadType"`
 }
 
 type ClientListRequestPayload struct {
-	PayloadType int `json:"payloadType"`
+	PayloadType PayloadType `json:"payloadType"`
 }
 
 type QuoteType struct {
@@ -64,29 +65,29 @@ type ReactionType struct {
 }
 
 type ReactionPayload struct {
-	PayloadType       int    `json:"payloadType"`
-	ReactionDbId      string `json:"reactionDbId"`
-	ReactionMessageId string `json:"reactionMessageId"`
-	ReactionContext   string `json:"reactionContext"`
-	ReactionClientId  string `json:"reactionClientId"`
+	PayloadType       PayloadType `json:"payloadType"`
+	ReactionDbId      string      `json:"reactionDbId"`
+	ReactionMessageId string      `json:"reactionMessageId"`
+	ReactionContext   string      `json:"reactionContext"`
+	ReactionClientId  string      `json:"reactionClientId"`
 }
 
 type TypingPayload struct {
-	PayloadType int    `json:"payloadType"`
-	ClientDbId  string `json:"clientDbId"`
-	IsTyping    bool   `json:"isTyping"`
+	PayloadType PayloadType `json:"payloadType"`
+	ClientDbId  string      `json:"clientDbId"`
+	IsTyping    bool        `json:"isTyping"`
 }
 
 type AuthenticationPayload struct {
-	PayloadType    int    `json:"payloadType"`
-	ClientUsername string `json:"clientUsername"`
-	ClientDbId     string `json:"clientDbId"`
+	PayloadType    PayloadType `json:"payloadType"`
+	ClientUsername string      `json:"clientUsername"`
+	ClientDbId     string      `json:"clientDbId"`
 }
 
 type ClientUpdatePayload struct {
-	PayloadType        int    `json:"payloadType"`
-	ClientDbId         string `json:"clientDbId"`
-	ClientUsername     string `json:"clientUsername"`
-	ClientColor        string `json:"clientColor"`
-	ClientProfileImage string `json:"clientProfileImage"`
+	PayloadType        PayloadType `json:"payloadType"`
+	ClientDbId         string      `json:"clientDbId"`
+	ClientUsername     string      `json:"clientUsername"`
+	ClientColor        string      `json:"clientColor"`
+	ClientProfileImage string      `json:"clientProfileImage"`
 }

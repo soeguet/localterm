@@ -88,7 +88,7 @@ func appendMessageToCache(message MessagePayload) (index int) {
 	index = cacheSize
 	messageCache[index] = message
 
-	return
+	return index
 }
 
 func getMessageFromCache(index int) MessagePayload {
