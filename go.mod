@@ -8,12 +8,12 @@ require (
 	github.com/gorilla/websocket v1.5.1
 	github.com/rivo/tview v0.0.0-20240505185119-ed116790de0f
 	github.com/stretchr/testify v1.9.0
+	github.com/gen2brain/beeep v0.0.0-20240112042604-c7bb2cd88fea
 )
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gdamore/encoding v1.0.1 // indirect
-	github.com/gen2brain/beeep v0.0.0-20240112042604-c7bb2cd88fea // indirect
 	github.com/go-toast/toast v0.0.0-20190211030409-01e6764cf0a4 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
@@ -28,3 +28,4 @@ require (
 	golang.org/x/text v0.15.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+

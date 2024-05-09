@@ -1,3 +1,4 @@
+// main package
 package main
 
 import (
@@ -5,7 +6,6 @@ import (
 )
 
 func main() {
-
 	app := createApp()
 
 	// Start the connection in a goroutine

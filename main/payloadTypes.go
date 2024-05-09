@@ -1,3 +1,4 @@
+// main package
 package main
 
 import (
@@ -7,86 +8,86 @@ import (
 	"github.com/rivo/tview"
 )
 
-type App struct {
+type app struct {
 	ui       *tview.Application
-	notifier Notifier
+	notifier notifier
 	conn     *websocket.Conn
 }
 
-type MessageListPayload struct {
-	PayloadType PayloadType      `json:"payloadType"`
-	MessageList []MessagePayload `json:"messageList"`
+type messageListPayload struct {
+	PayloadType payloadType      `json:"payloadType"`
+	MessageList []messagePayload `json:"messageList"`
 }
 
-type GenericMessage struct {
-	PayloadType PayloadType     `json:"payloadType"`
+type genericMessage struct {
+	PayloadType payloadType     `json:"payloadType"`
 	Payload     json.RawMessage `json:"payload"`
 }
 
-type MessagePayload struct {
-	PayloadType  PayloadType     `json:"payloadType"`
-	MessageType  MessageType     `json:"messageType"`
-	ClientType   ClientType      `json:"clientType"`
-	QuoteType    *QuoteType      `json:"quoteType"`
-	ReactionType *[]ReactionType `json:"reactionType"`
+type messagePayload struct {
+	PayloadType  payloadType     `json:"payloadType"`
+	MessageType  messageType     `json:"messageType"`
+	ClientType   clientType      `json:"clientType"`
+	QuoteType    *quoteType      `json:"quoteType"`
+	ReactionType *[]reactionType `json:"reactionType"`
 }
 
-type MessageType struct {
-	MessageDbId    string `json:"messageDbId"`
+type messageType struct {
+	MessageDbID    string `json:"messageDbId"`
 	MessageContext string `json:"messageContext"`
 	MessageTime    string `json:"messageTime"`
 	MessageDate    string `json:"messageDate"`
 }
 
-type ClientType struct {
-	ClientDbId string `json:"clientDbId"`
+type clientType struct {
+	ClientDbID string `json:"clientDbId"`
 }
 
-type MessageListRequestPayload struct {
-	PayloadType PayloadType `json:"payloadType"`
+type messageListRequestPayload struct {
+	PayloadType payloadType `json:"payloadType"`
 }
 
-type ClientListRequestPayload struct {
-	PayloadType PayloadType `json:"payloadType"`
+type clientListRequestPayload struct {
+	PayloadType payloadType `json:"payloadType"`
 }
 
-type QuoteType struct {
-	QuoteDbId           string `json:"quoteDbId"`
-	QuoteClientId       string `json:"quoteClientId"`
+type quoteType struct {
+	QuoteDbID           string `json:"quoteDbId"`
+	QuoteClientID       string `json:"quoteClientId"`
 	QuoteMessageContext string `json:"quoteMessageContext"`
 	QuoteTime           string `json:"quoteTime"`
 	QuoteDate           string `json:"quoteDate"`
 }
 
-type ReactionType struct {
-	ReactionMessageId string `json:"reactionMessageId"`
+type reactionType struct {
+	ReactionMessageID string `json:"reactionMessageId"`
 	ReactionContext   string `json:"reactionContext"`
-	ReactionClientId  string `json:"reactionClientId"`
+	ReactionClientID  string `json:"reactionClientId"`
 }
 
-type ReactionPayload struct {
-	PayloadType       PayloadType `json:"payloadType"`
-	ReactionDbId      string      `json:"reactionDbId"`
-	ReactionMessageId string      `json:"reactionMessageId"`
+type reactionPayload struct {
+	PayloadType       payloadType `json:"payloadType"`
+	ReactionDbID      string      `json:"reactionDbId"`
+	ReactionMessageID string      `json:"reactionMessageId"`
 	ReactionContext   string      `json:"reactionContext"`
-	ReactionClientId  string      `json:"reactionClientId"`
+	ReactionClientID  string      `json:"reactionClientId"`
 }
 
-type TypingPayload struct {
-	PayloadType PayloadType `json:"payloadType"`
-	ClientDbId  string      `json:"clientDbId"`
+type typingPayload struct {
+	PayloadType payloadType `json:"payloadType"`
+	ClientDbID  string      `json:"clientDbId"`
 	IsTyping    bool        `json:"isTyping"`
 }
 
-type AuthenticationPayload struct {
-	PayloadType    PayloadType `json:"payloadType"`
+type authenticationPayload struct {
+	PayloadType    payloadType `json:"payloadType"`
 	ClientUsername string      `json:"clientUsername"`
-	ClientDbId     string      `json:"clientDbId"`
+	ClientDbID     string      `json:"clientDbId"`
 }
 
-type ClientUpdatePayload struct {
-	PayloadType        PayloadType `json:"payloadType"`
-	ClientDbId         string      `json:"clientDbId"`
+type clientUpdatePayload struct {
+	PayloadType        payloadType `json:"payloadType"`
+	ClientDbID         string      `json:"clientDbId"`
 	ClientUsername     string      `json:"clientUsername"`
 	ClientColor        string      `json:"clientColor"`
 	ClientProfileImage string      `json:"clientProfileImage"`

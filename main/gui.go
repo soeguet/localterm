@@ -1,3 +1,4 @@
+// main package
 package main
 
 import (
@@ -16,28 +17,57 @@ import (
 )
 
 const (
-	margin = "            "
+	margin   = "            "
+	message  = " Message: "
+	quote    = "   Quote: "
+	reaction = "Reaction: "
+	setting  = "Settings: "
 )
 
 var (
-	chatView *tview.TextView
-	flex     tview.Flex
+	textLabel  string
+	chatView   *tview.TextView
+	flex       tview.Flex
+	typingView *tview.TextView
+	inputField *tview.InputField
 )
 
-func newApp(ui *tview.Application, conn *websocket.Conn) (*App, error) {
+func (app *app) getTypingViewTextLabel() string {
+	return typingView.GetLabel()
+}
 
+func newApp(ui *tview.Application, conn *websocket.Conn) (*app, error) {
 	// initial request to websocket after handshake
 	// asks for all RegisteredUsers in a clientList
 	err := authenticateClientAtSocket(conn)
 
-	return &App{
+	return &app{
 		ui:       ui,
-		notifier: &BeeepNotifier{},
+		notifier: &beeepNotifier{},
 		conn:     conn,
 	}, err
 }
 
-func createChatView(app *App) *tview.TextView {
+func changeTextLabelText(text string) {
+	inputField.SetLabel(text)
+}
+
+func createTypingView(app *app) *tview.TextView {
+	textView := tview.NewTextView().
+		SetChangedFunc(func() {
+			app.ui.Draw()
+		})
+	textView.SetTextColor(tcell.ColorGray)
+
+	return textView
+}
+
+func (app *app) setTypingLabelText(text string) {
+	typingView.SetText(text)
+	app.ui.Draw()
+}
+
+func createChatView(app *app) *tview.TextView {
 	textView := tview.NewTextView().
 		SetDynamicColors(true).
 		SetScrollable(true).
@@ -48,16 +78,16 @@ func createChatView(app *App) *tview.TextView {
 	return textView
 }
 
-func addNewMessageToScrollPanel(index *int, payload *MessagePayload) {
+func addNewMessageToScrollPanel(index *int, payload *messagePayload) {
 	messageIndex := fmt.Sprintf("[gray][%03d][-]", *index)
 	decodedString, err := decodeBase64ToString(payload.MessageType.MessageContext)
 	if err != nil {
 		fmt.Println("Error decoding base64 to string:", err)
 	}
 
-	payloadUsername := getUsernameForId(payload.ClientType.ClientDbId)
+	payloadUsername := getUsernameForID(payload.ClientType.ClientDbID)
 
-	usernameColor := fmt.Sprintf("[%s]", getClientColor(payload.ClientType.ClientDbId))
+	usernameColor := fmt.Sprintf("[%s]", getClientColor(payload.ClientType.ClientDbID))
 
 	var quote string
 	if payload.QuoteType != nil {
@@ -79,8 +109,8 @@ func addNewMessageToScrollPanel(index *int, payload *MessagePayload) {
 	chatView.ScrollToEnd()
 }
 
-func checkForQuote(quoteType QuoteType) string {
-	if quoteType.QuoteClientId == "" {
+func checkForQuote(quoteType quoteType) string {
+	if quoteType.QuoteClientID == "" {
 		return ""
 	}
 
@@ -90,7 +120,7 @@ func checkForQuote(quoteType QuoteType) string {
 	}
 
 	quoteString := fmt.Sprintf("%s[#997275]┌ [%s - %s: %s]\n", margin, quoteType.QuoteTime,
-		getUsernameForId(quoteType.QuoteClientId), msg)
+		getUsernameForID(quoteType.QuoteClientID), msg)
 
 	return quoteString
 }
@@ -101,7 +131,7 @@ func checkForQuote(quoteType QuoteType) string {
 // The 'ReactionType' struct defines the structure of a reaction and is not included in this documentation.
 // The function uses the 'strings.Builder' type to build the formatted string efficiently.
 // Returns the formatted string representing the reactions or an empty string if an error occurs.
-func checkForReactions(reactionType []ReactionType) string {
+func checkForReactions(reactionType []reactionType) string {
 	if len(reactionType) == 0 {
 		return ""
 	}
@@ -146,109 +176,113 @@ func evalTextInChatView(text string) int {
 // It also sets up event handlers for text changes and when the enter key is pressed.
 // The input field's field text color is set based on the evaluation of the input text using evalTextInChatView.
 // It returns the created input field.
-func createInputField(app *App) *tview.InputField {
-	inputField := tview.NewInputField()
-	inputField.SetLabel("Message: ")
-	inputField.SetLabelColor(tcell.ColorGreenYellow)
-	inputField.SetFieldBackgroundColor(tcell.ColorBlueViolet)
+func createInputField(app *app) *tview.InputField {
+	customInputField := tview.NewInputField()
+	inputField = customInputField.
+		SetLabel(message).
+		SetLabelColor(tcell.ColorGreenYellow).
+		SetFieldBackgroundColor(tcell.ColorBlueViolet).
+		SetChangedFunc(func(text string) {
+			textCase := evalTextInChatView(text)
 
-	inputField.SetChangedFunc(func(text string) {
-		textCase := evalTextInChatView(text)
-
-		if textCase == 0 {
-			textCase = evalTextInChatViewV2(text)
-		}
-
-		if textCase == 0 {
-			textCase = evalTextInChatViewV3(text)
-		}
-
-		switch textCase {
-		case 1:
-			// quote
-			inputField.SetFieldBackgroundColor(tcell.ColorDarkSlateGray)
-			inputField.SetFieldTextColor(tcell.ColorDarkOrange)
-		case 2:
-			// reaction
-			inputField.SetFieldBackgroundColor(tcell.ColorDarkSlateGray)
-			inputField.SetFieldTextColor(tcell.ColorGreen)
-		case 3:
-			// settings change
-			inputField.SetFieldBackgroundColor(tcell.ColorDarkSlateGray)
-			inputField.SetFieldTextColor(tcell.ColorYellow)
-		default:
-			inputField.SetFieldBackgroundColor(tcell.ColorBlueViolet)
-			inputField.SetFieldTextColor(tcell.ColorWhite)
-		}
-	})
-
-	inputField.SetDoneFunc(func(key tcell.Key) {
-		if key == tcell.KeyEnter {
-
-			textInput := inputField.GetText()
-
-			// check for [000] > or [000] >> in the message
-			textCase := evalTextInChatView(textInput)
-
-			if textCase != 0 {
-				switch textCase {
-				case 1:
-					// quote
-					sendQuotedMessagePayloadToWebsocket(app.conn, &textInput)
-				case 2:
-					// reaction
-					sendReactionPayloadToWebsocket(app.conn, &textInput)
-				default:
-					// plain message
-					sendMessagePayloadToWebsocket(app.conn, &textInput)
-				}
-
-				inputField.SetText("")
-				return
+			if textCase == 0 {
+				textCase = evalTextInChatViewV2(text)
 			}
 
-			// check for /q or /r followed by three digits and a space
-			textCaseV2 := evalTextInChatViewV2(textInput)
-			if textCaseV2 != 0 {
-				switch textCaseV2 {
-				case 1:
-					sendQuotedMessagePayloadToWebsocketV2(app.conn, &textInput)
+			if textCase == 0 {
+				textCase = evalTextInChatViewV3(text)
+			}
+
+			switch textCase {
+			case 1:
 				// quote
-				case 2:
-					sendReactionPayloadToWebsocketV2(app.conn, &textInput)
+				customInputField.SetFieldBackgroundColor(tcell.ColorDarkSlateGray)
+				customInputField.SetFieldTextColor(tcell.ColorDarkOrange)
+				changeTextLabelText(quote)
+			case 2:
 				// reaction
-				default:
-					// plain message
-					sendMessagePayloadToWebsocket(app.conn, &textInput)
-				}
-				inputField.SetText("")
-				return
-			}
-
-			textCaseV3 := evalTextInChatViewV3(textInput)
-
-			if textCaseV3 != 0 {
-				switch textCaseV3 {
-				case 4:
-					// settings change
-					sendProfileUpdateToWebsocket(app.conn, &textInput)
-				case 5:
+				customInputField.SetFieldBackgroundColor(tcell.ColorDarkSlateGray)
+				customInputField.SetFieldTextColor(tcell.ColorGreen)
+				changeTextLabelText(reaction)
+			case 3:
 				// settings change
-				default:
-					// plain message
-					sendMessagePayloadToWebsocket(app.conn, &textInput)
+				customInputField.SetFieldBackgroundColor(tcell.ColorDarkSlateGray)
+				customInputField.SetFieldTextColor(tcell.ColorYellow)
+				changeTextLabelText(setting)
 
-					inputField.SetText("")
-
-				}
-				inputField.SetText("")
-				return
+			default:
+				customInputField.SetFieldBackgroundColor(tcell.ColorBlueViolet)
+				customInputField.SetFieldTextColor(tcell.ColorWhite)
+				changeTextLabelText(message)
 			}
+		}).
+		SetDoneFunc(func(key tcell.Key) {
+			if key == tcell.KeyEnter {
 
-			sendMessagePayloadToWebsocket(app.conn, &textInput)
-			inputField.SetText("")
-		}
-	})
+				textInput := customInputField.GetText()
+
+				// check for [000] > or [000] >> in the message
+				textCase := evalTextInChatView(textInput)
+
+				if textCase != 0 {
+					switch textCase {
+					case 1:
+						// quote
+						sendQuotedMessagePayloadToWebsocket(app.conn, &textInput)
+					case 2:
+						// reaction
+						sendReactionPayloadToWebsocket(app.conn, &textInput)
+					default:
+						// plain message
+						sendMessagePayloadToWebsocket(app.conn, &textInput)
+					}
+
+					customInputField.SetText("")
+					return
+				}
+
+				// check for /q or /r followed by three digits and a space
+				textCaseV2 := evalTextInChatViewV2(textInput)
+				if textCaseV2 != 0 {
+					switch textCaseV2 {
+					case 1:
+						sendQuotedMessagePayloadToWebsocketV2(app.conn, &textInput)
+					// quote
+					case 2:
+						sendReactionPayloadToWebsocketV2(app.conn, &textInput)
+					// reaction
+					default:
+						// plain message
+						sendMessagePayloadToWebsocket(app.conn, &textInput)
+					}
+					customInputField.SetText("")
+					return
+				}
+
+				textCaseV3 := evalTextInChatViewV3(textInput)
+
+				if textCaseV3 != 0 {
+					switch textCaseV3 {
+					case 4:
+						// settings change
+						sendProfileUpdateToWebsocket(app.conn, &textInput)
+					case 5:
+					// settings change
+					default:
+						// plain message
+						sendMessagePayloadToWebsocket(app.conn, &textInput)
+
+						customInputField.SetText("")
+
+					}
+					customInputField.SetText("")
+					return
+				}
+
+				sendMessagePayloadToWebsocket(app.conn, &textInput)
+				customInputField.SetText("")
+			}
+		})
 
 	// inputField.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 	// 	if event.Key() == tcell.KeyF1 {
@@ -260,7 +294,7 @@ func createInputField(app *App) *tview.InputField {
 	// 	return event
 	// })
 
-	return inputField
+	return customInputField
 }
 
 func sendProfileUpdateToWebsocket(conn *websocket.Conn, message *string) {
@@ -274,9 +308,9 @@ func sendProfileUpdateToWebsocket(conn *websocket.Conn, message *string) {
 	thisClient := getThisClient()
 
 	if checkIfTrimmedMessageIsAHexColor {
-		profileUpdatePayload := ClientUpdatePayload{
+		profileUpdatePayload := clientUpdatePayload{
 			PayloadType:        3,
-			ClientDbId:         thisClient.ClientDbId,
+			ClientDbID:         thisClient.ClientDbID,
 			ClientColor:        trimmedMessage,
 			ClientUsername:     thisClient.ClientUsername,
 			ClientProfileImage: thisClient.ClientProfileImage,
@@ -294,11 +328,8 @@ func checkIfHexColor(trimmedMessage string) bool {
 	re := regexp.MustCompile(regexPattern)
 
 	matches := re.FindStringSubmatch(trimmedMessage)
-	if matches != nil {
-		return true
-	} else {
-		return false
-	}
+
+	return matches != nil
 }
 
 // checks for /q or /r followed by three digits and a space
@@ -323,15 +354,15 @@ func evalTextInChatViewV2(text string) int {
 
 // checks for /s followed by three digits and a space
 func evalTextInChatViewV3(text string) int {
-	regexPattern := `^/s[n,c] `
+	regexPattern := `^/s[n,c][0-9]{3} `
 	re := regexp.MustCompile(regexPattern)
 
 	matches := re.FindStringSubmatch(text)
 	if matches != nil {
 		return 3
-	} else {
-		return 0
 	}
+
+	return 0
 }
 
 func sendReactionPayloadToWebsocketV2(conn *websocket.Conn, message *string) {
@@ -343,12 +374,12 @@ func sendReactionPayloadToWebsocketV2(conn *websocket.Conn, message *string) {
 	// remove the first 5 characters
 	trimmedMessage := (*message)[6:]
 
-	reactionPayload := ReactionPayload{
+	reactionPayload := reactionPayload{
 		PayloadType:       7,
-		ReactionDbId:      uuid.New().String(),
-		ReactionMessageId: reactedMessagePayload.MessageType.MessageDbId,
+		ReactionDbID:      uuid.New().String(),
+		ReactionMessageID: reactedMessagePayload.MessageType.MessageDbID,
 		ReactionContext:   trimmedMessage,
-		ReactionClientId:  envVars.Id,
+		ReactionClientID:  envVars.ID,
 	}
 
 	err := conn.WriteJSON(reactionPayload)
@@ -366,12 +397,12 @@ func sendReactionPayloadToWebsocket(conn *websocket.Conn, message *string) {
 	// remove the first 8 characters
 	trimmedMessage := (*message)[8:]
 
-	reactionPayload := ReactionPayload{
+	reactionPayload := reactionPayload{
 		PayloadType:       7,
-		ReactionDbId:      uuid.New().String(),
-		ReactionMessageId: reactedMessagePayload.MessageType.MessageDbId,
+		ReactionDbID:      uuid.New().String(),
+		ReactionMessageID: reactedMessagePayload.MessageType.MessageDbID,
 		ReactionContext:   trimmedMessage,
-		ReactionClientId:  envVars.Id,
+		ReactionClientID:  envVars.ID,
 	}
 
 	err := conn.WriteJSON(reactionPayload)
@@ -389,20 +420,20 @@ func sendQuotedMessagePayloadToWebsocketV2(conn *websocket.Conn, message *string
 	// remove the first 5 characters
 	trimmedMessage := (*message)[5:]
 
-	messagePayload := MessagePayload{
+	messagePayload := messagePayload{
 		PayloadType: 1,
-		MessageType: MessageType{
-			MessageDbId:    "TOBEREMOVED",
+		MessageType: messageType{
+			MessageDbID:    "TOBEREMOVED",
 			MessageContext: base64.StdEncoding.EncodeToString([]byte(trimmedMessage)),
 			MessageTime:    time.Now().Format("15:04"),
 			MessageDate:    time.Now().Format("2006-01-02"),
 		},
-		ClientType: ClientType{
-			ClientDbId: envVars.Id,
+		ClientType: clientType{
+			ClientDbID: envVars.ID,
 		},
-		QuoteType: &QuoteType{
-			QuoteDbId:           quotedMessagePayload.MessageType.MessageDbId,
-			QuoteClientId:       quotedMessagePayload.ClientType.ClientDbId,
+		QuoteType: &quoteType{
+			QuoteDbID:           quotedMessagePayload.MessageType.MessageDbID,
+			QuoteClientID:       quotedMessagePayload.ClientType.ClientDbID,
 			QuoteMessageContext: quotedMessagePayload.MessageType.MessageContext,
 			QuoteTime:           quotedMessagePayload.MessageType.MessageTime,
 			QuoteDate:           quotedMessagePayload.MessageType.MessageDate,
@@ -425,20 +456,20 @@ func sendQuotedMessagePayloadToWebsocket(conn *websocket.Conn, message *string) 
 	// remove the first 7 characters
 	trimmedMessage := (*message)[7:]
 
-	messagePayload := MessagePayload{
+	messagePayload := messagePayload{
 		PayloadType: 1,
-		MessageType: MessageType{
-			MessageDbId:    "TOBEREMOVED",
+		MessageType: messageType{
+			MessageDbID:    "TOBEREMOVED",
 			MessageContext: base64.StdEncoding.EncodeToString([]byte(trimmedMessage)),
 			MessageTime:    time.Now().Format("15:04"),
 			MessageDate:    time.Now().Format("2006-01-02"),
 		},
-		ClientType: ClientType{
-			ClientDbId: envVars.Id,
+		ClientType: clientType{
+			ClientDbID: envVars.ID,
 		},
-		QuoteType: &QuoteType{
-			QuoteDbId:           quotedMessagePayload.MessageType.MessageDbId,
-			QuoteClientId:       quotedMessagePayload.ClientType.ClientDbId,
+		QuoteType: &quoteType{
+			QuoteDbID:           quotedMessagePayload.MessageType.MessageDbID,
+			QuoteClientID:       quotedMessagePayload.ClientType.ClientDbID,
 			QuoteMessageContext: quotedMessagePayload.MessageType.MessageContext,
 			QuoteTime:           quotedMessagePayload.MessageType.MessageTime,
 			QuoteDate:           quotedMessagePayload.MessageType.MessageDate,
@@ -461,16 +492,18 @@ func atoi(index string) int {
 	return i
 }
 
-func (app *App) clearChatView() {
+func (app *app) clearChatView() {
 	chatView.Clear()
 }
 
-func createFlex(app *App) tview.Flex {
+func createFlex(app *app) tview.Flex {
 	flex := tview.NewFlex()
 	inputField := createInputField(app)
+	typingView = createTypingView(app)
 	flex.SetDirection(tview.FlexRow)
 	flex.AddItem(chatView, 0, 1, false)
-	flex.AddItem(inputField, 3, 1, true)
+	flex.AddItem(inputField, 1, 1, true)
+	flex.AddItem(typingView, 1, 1, false)
 
 	return *flex
 }
@@ -495,7 +528,7 @@ func createFlex(app *App) tview.Flex {
 // 	return modal
 // }
 
-func gui(app *App) error {
+func gui(app *app) error {
 	chatView = createChatView(app)
 	flex = createFlex(app)
 	// modal = createModal(app)

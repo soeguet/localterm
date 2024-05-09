@@ -1,3 +1,4 @@
+// main package
 package main
 
 import (
@@ -8,28 +9,26 @@ import (
 	"github.com/rivo/tview"
 )
 
-type Notifier interface {
+type notifier interface {
 	Notify(title, message, icon string) error
 }
 
-type BeeepNotifier struct{}
+type beeepNotifier struct{}
 
-func (bn *BeeepNotifier) Notify(title, message, icon string) error {
+func (bn *beeepNotifier) Notify(title, message, _ string) error {
 	return beeep.Notify(title, message, "")
 }
 
-func (app *App) desktopNotification(payload *MessagePayload) error {
-
+func (app *app) desktopNotification(payload *messagePayload) error {
 	decodedString, err := decodeBase64ToString(payload.MessageType.MessageContext)
-
 	if err != nil {
 		fmt.Println("Error decoding base64 to string:", err)
 	}
 
-	return app.notifier.Notify("message from "+payload.ClientType.ClientDbId, decodedString, "")
+	return app.notifier.Notify("message from "+payload.ClientType.ClientDbID, decodedString, "")
 }
 
-func createApp() *App {
+func createApp() *app {
 	ui := tview.NewApplication()
 
 	conn, err := createConnection(getEnvIP(), getEnvPort())

@@ -1,3 +1,4 @@
+// main package
 package main
 
 import (
@@ -12,20 +13,19 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type PayloadType int
+type payloadType int
 
 const (
-	AuthenticationTypeConst  PayloadType = 0
-	MessageTypeConst         PayloadType = 1
-	ClientListTypeConst      PayloadType = 2
-	MessageListTypeConst     PayloadType = 4
-	TypingIndicatorTypeConst PayloadType = 5
-	ClientTypingConst        PayloadType = 6
-	GetMessagesTypeConst     PayloadType = 7
+	authenticationTypeConst  payloadType = 0
+	messageTypeConst         payloadType = 1
+	clientListTypeConst      payloadType = 2
+	messageListTypeConst     payloadType = 4
+	typingIndicatorTypeConst payloadType = 5
+	clientTypingConst        payloadType = 6
+	getMessagesTypeConst     payloadType = 7
 )
 
-func handlePayloadsOfMessageType(message []byte, app *App) {
-
+func handlePayloadsOfMessageType(message []byte, app *app) {
 	messagePayload, err := unmarshallPayloadToMessagePayload(message)
 	if err != nil {
 		fmt.Println("Error parsing messagePayload:", err)
@@ -41,9 +41,9 @@ func handlePayloadsOfMessageType(message []byte, app *App) {
 	handleDesktopNotificationPossibility(messagePayload, app)
 }
 
-func handleDesktopNotificationPossibility(messagePayload MessagePayload, app *App) {
+func handleDesktopNotificationPossibility(messagePayload messagePayload, app *app) {
 	// check if message is from this client and do not send desktop notification
-	if messagePayload.ClientType.ClientDbId == envVars.Id {
+	if messagePayload.ClientType.ClientDbID == envVars.ID {
 		return
 	}
 
@@ -54,8 +54,8 @@ func handleDesktopNotificationPossibility(messagePayload MessagePayload, app *Ap
 	}
 }
 
-func unmarshallPayloadToMessagePayload(message []byte) (MessagePayload, error) {
-	var messagePayload MessagePayload
+func unmarshallPayloadToMessagePayload(message []byte) (messagePayload, error) {
+	var messagePayload messagePayload
 
 	if err := json.Unmarshal(message, &messagePayload); err != nil {
 		fmt.Println("Error parsing messagePayload:", err)
@@ -64,8 +64,7 @@ func unmarshallPayloadToMessagePayload(message []byte) (MessagePayload, error) {
 	return messagePayload, nil
 }
 
-func handlePayloadsOfMessageListType(message []byte, app *App) {
-
+func handlePayloadsOfMessageListType(message []byte, app *app) {
 	messageListPayload := unmarshallMessageToMessageListPayload(message)
 
 	resetMessageCache()
@@ -77,25 +76,32 @@ func handlePayloadsOfMessageListType(message []byte, app *App) {
 	}
 }
 
-func unmarshallMessageToMessageListPayload(message []byte) MessageListPayload {
-	var messageListPayload MessageListPayload
+func unmarshallMessageToMessageListPayload(message []byte) messageListPayload {
+	var messageListPayload messageListPayload
 	if err := json.Unmarshal(message, &messageListPayload); err != nil {
 		fmt.Println("Error parsing messageListPayload:", err)
 	}
 	return messageListPayload
 }
 
-func handlePayloadsOfTypingIndicatorType(message []byte, app *App) {
-	var typingPayload TypingPayload
+func handlePayloadsOfTypingIndicatorType(message []byte, app *app) {
+	var typingPayload typingPayload
 	if err := json.Unmarshal(message, &typingPayload); err != nil {
 		fmt.Println("Error parsing typingPayload:", err)
 	}
 
-	// TODO implement typing indicator
+	if typingPayload.IsTyping {
+		addTypingClient(typingPayload.ClientDbID)
+	} else {
+		removeTypingClient(typingPayload.ClientDbID)
+	}
+
+	typingLabelText := generateTypingString()
+	fmt.Println(typingLabelText)
+	app.setTypingLabelText(typingLabelText)
 }
 
-func handlePayloadsOfClientListType(message []byte, app *App) {
-
+func handlePayloadsOfClientListType(message []byte, app *app) {
 	clientListPayload, err := unmarshallMessageToClientListPayload(message)
 	if err != nil {
 		fmt.Println("Error parsing clientListPayload:", err)
@@ -109,8 +115,8 @@ func handlePayloadsOfClientListType(message []byte, app *App) {
 	retrieveLast100Messages(app.conn)
 }
 
-func unmarshallMessageToClientListPayload(message []byte) (ClientList, error) {
-	var clientListPayload ClientList
+func unmarshallMessageToClientListPayload(message []byte) (clientListStruct, error) {
+	var clientListPayload clientListStruct
 	if err := json.Unmarshal(message, &clientListPayload); err != nil {
 		fmt.Println("Error parsing clientListPayload:", err)
 		return clientListPayload, err
@@ -118,8 +124,8 @@ func unmarshallMessageToClientListPayload(message []byte) (ClientList, error) {
 	return clientListPayload, nil
 }
 
-func handlePayload(message []byte, app *App) {
-	var msg GenericMessage
+func handlePayload(message []byte, app *app) {
+	var msg genericMessage
 	if err := json.Unmarshal(message, &msg); err != nil {
 		fmt.Println("Error parsing JSON:", err)
 		return
@@ -127,19 +133,19 @@ func handlePayload(message []byte, app *App) {
 
 	switch msg.PayloadType {
 
-	case MessageTypeConst:
+	case messageTypeConst:
 		handlePayloadsOfMessageType(message, app)
 
-	case ClientListTypeConst:
+	case clientListTypeConst:
 		handlePayloadsOfClientListType(message, app)
 
-	case MessageListTypeConst:
+	case messageListTypeConst:
 		handlePayloadsOfMessageListType(message, app)
 
-	case TypingIndicatorTypeConst:
+	case typingIndicatorTypeConst:
 		handlePayloadsOfTypingIndicatorType(message, app)
 
-	case GetMessagesTypeConst:
+	case getMessagesTypeConst:
 		retrieveLast100Messages(app.conn)
 
 	default:
@@ -149,7 +155,7 @@ func handlePayload(message []byte, app *App) {
 	app.ui.Draw()
 }
 
-func connection(app *App) error {
+func connection(app *app) error {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 	defer func(c *websocket.Conn) {
@@ -194,16 +200,16 @@ func connection(app *App) error {
 }
 
 func sendMessagePayloadToWebsocket(conn *websocket.Conn, message *string) {
-	messagePayload := MessagePayload{
-		PayloadType: MessageTypeConst,
-		MessageType: MessageType{
-			MessageDbId:    "TOBEREMOVED",
+	messagePayload := messagePayload{
+		PayloadType: messageTypeConst,
+		MessageType: messageType{
+			MessageDbID:    "TOBEREMOVED",
 			MessageContext: base64.StdEncoding.EncodeToString([]byte(*message)),
 			MessageTime:    time.Now().Format("15:04"),
 			MessageDate:    time.Now().Format("2006-01-02"),
 		},
-		ClientType: ClientType{
-			ClientDbId: envVars.Id,
+		ClientType: clientType{
+			ClientDbID: envVars.ID,
 		},
 	}
 
@@ -216,8 +222,8 @@ func sendMessagePayloadToWebsocket(conn *websocket.Conn, message *string) {
 
 func retrieveLast100Messages(c *websocket.Conn) {
 	// Get the last 100 messages
-	messageListPayload := MessageListRequestPayload{
-		PayloadType: MessageListTypeConst,
+	messageListPayload := messageListRequestPayload{
+		PayloadType: messageListTypeConst,
 	}
 
 	if err := c.WriteJSON(messageListPayload); err != nil {
@@ -241,16 +247,16 @@ func authenticateClientAtSocket(c *websocket.Conn) error {
 }
 
 func getAuthenticationPayloadBytes() ([]byte, error) {
-	authenticationPayload := AuthenticationPayload{
-		PayloadType:    AuthenticationTypeConst,
+	authenticationPayload := authenticationPayload{
+		PayloadType:    authenticationTypeConst,
 		ClientUsername: getEnvUsername(),
-		ClientDbId:     envVars.Id,
+		ClientDbID:     envVars.ID,
 	}
 	return json.Marshal(authenticationPayload)
 }
 
-func createConnection(localChatIp string, localChatPort string) (*websocket.Conn, error) {
-	url := fmt.Sprintf("ws://%s:%s/chat", localChatIp, localChatPort)
+func createConnection(localChatIP string, localChatPort string) (*websocket.Conn, error) {
+	url := fmt.Sprintf("ws://%s:%s/chat", localChatIP, localChatPort)
 
 	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
 	if err != nil {

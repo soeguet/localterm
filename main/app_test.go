@@ -2,16 +2,20 @@ package main
 
 import (
 	"errors"
+	"reflect"
 	"testing"
+
+	"github.com/gorilla/websocket"
+	"github.com/rivo/tview"
 )
 
 type MockNotifier struct {
+	Err   error
 	Calls []struct {
 		Title   string
 		Message string
 		Icon    string
 	}
-	Err error
 }
 
 func (m *MockNotifier) Notify(title, message, icon string) error {
@@ -25,7 +29,7 @@ func (m *MockNotifier) Notify(title, message, icon string) error {
 
 func TestSendNotification(t *testing.T) {
 	mockNotifier := &MockNotifier{}
-	app := App{notifier: mockNotifier}
+	app := app{notifier: mockNotifier}
 
 	title := "Test Title"
 	message := "Test Message"
@@ -48,5 +52,76 @@ func TestSendNotification(t *testing.T) {
 	}
 	if err.Error() != "notification failed" {
 		t.Errorf("Expected error 'notification failed', got %v", err)
+	}
+}
+
+func TestBeeepNotifier_Notify(t *testing.T) {
+	type args struct {
+		title   string
+		message string
+		icon    string
+	}
+	tests := []struct {
+		name    string
+		bn      *beeepNotifier
+		args    args
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bn := &beeepNotifier{}
+			if err := bn.Notify(tt.args.title, tt.args.message, tt.args.icon); (err != nil) != tt.wantErr {
+				t.Errorf("BeeepNotifier.Notify() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestApp_desktopNotification(t *testing.T) {
+	type fields struct {
+		ui       *tview.Application
+		notifier notifier
+		conn     *websocket.Conn
+	}
+	type args struct {
+		payload *messagePayload
+	}
+	tests := []struct {
+		fields  fields
+		args    args
+		name    string
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			app := &app{
+				ui:       tt.fields.ui,
+				notifier: tt.fields.notifier,
+				conn:     tt.fields.conn,
+			}
+			if err := app.desktopNotification(tt.args.payload); (err != nil) != tt.wantErr {
+				t.Errorf("App.desktopNotification() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_createApp(t *testing.T) {
+	tests := []struct {
+		want *app
+		name string
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := createApp(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("createApp() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

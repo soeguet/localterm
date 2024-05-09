@@ -1,3 +1,4 @@
+// main package
 package main
 
 import (
@@ -5,48 +6,102 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/google/uuid"
 )
 
 func init() {
-	setClientId()
+	setClientID()
 }
 
 var (
 	mutex               sync.Mutex
 	clientUsernameCache = make(map[string]string)
 	clientColorCache    = make(map[string]string)
-	messageCache        = make(map[int]MessagePayload)
-	clientList          ClientList
-	thisClient          Client
-	envVars             = EnvVars{
+	messageCache        = make(map[int]messagePayload)
+	typingClientCache   = []string{}
+	clientList          clientListStruct
+	thisClient          client
+	envVars             = envVarsStruct{
 		Username: os.Getenv("LOCALCHAT_USERNAME"),
 		IP:       os.Getenv("LOCALCHAT_IP"),
 		Port:     os.Getenv("LOCALCHAT_PORT"),
 		Os:       runtime.GOOS,
-		Id:       setClientId(),
+		ID:       setClientID(),
 	}
 )
 
-type Client struct {
-	ClientDbId         string `json:"clientDbId"`
+type client struct {
+	ClientDbID         string `json:"clientDbId"`
 	ClientUsername     string `json:"clientUsername"`
 	ClientColor        string `json:"clientColor"`
 	ClientProfileImage string `json:"clientProfileImage"`
 }
 
-type ClientList struct {
-	Clients []Client `json:"clients"`
+type clientListStruct struct {
+	Clients []client `json:"clients"`
 }
 
-type EnvVars struct {
+type envVarsStruct struct {
 	Username string `json:"username"`
 	IP       string `json:"ip"`
 	Port     string `json:"port"`
 	Os       string `json:"os"`
-	Id       string `json:"id"`
+	ID       string `json:"id"`
+}
+
+func addTypingClient(clientID string) {
+	mutex.Lock()
+	defer mutex.Unlock()
+	typingClientCache = append(typingClientCache, clientID)
+}
+
+func removeTypingClient(clientID string) {
+	mutex.Lock()
+	defer mutex.Unlock()
+	for i, v := range typingClientCache {
+		if v == clientID {
+			typingClientCache = append(typingClientCache[:i], typingClientCache[i+1:]...)
+			return
+		}
+	}
+}
+
+func generateTypingString() string {
+	// this freezes the UI
+	// mutex.Lock()
+	// defer mutex.Unlock()
+
+	if len(typingClientCache) == 0 {
+		return ""
+	}
+	if len(typingClientCache) == 1 {
+		return getUsernameForID(typingClientCache[0]) + " is typing..."
+	}
+
+	// if there are multiple clients typing
+	var builder strings.Builder
+	length := len(typingClientCache)
+
+	for i, v := range typingClientCache {
+		username := getUsernameForID(v)
+		if i == length-1 && i != 0 {
+			builder.WriteString("and ")
+		}
+		builder.WriteString(username)
+		if i < length-1 {
+			if i == length-2 {
+				builder.WriteString(" ")
+			} else {
+				builder.WriteString(", ")
+			}
+		}
+	}
+
+	builder.WriteString(" are typing...")
+	return builder.String()
 }
 
 func getEnvUsername() string {
@@ -70,7 +125,7 @@ func getEnvPort() string {
 	return envVars.Port
 }
 
-func getThisClient() Client {
+func getThisClient() client {
 	return thisClient
 }
 
@@ -78,9 +133,10 @@ func resetMessageCache() {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	messageCache = make(map[int]MessagePayload)
+	messageCache = make(map[int]messagePayload)
 }
-func appendMessageToCache(message MessagePayload) (index int) {
+
+func appendMessageToCache(message messagePayload) (index int) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -91,29 +147,29 @@ func appendMessageToCache(message MessagePayload) (index int) {
 	return index
 }
 
-func getMessageFromCache(index int) MessagePayload {
+func getMessageFromCache(index int) messagePayload {
 	mutex.Lock()
 	defer mutex.Unlock()
 
 	return messageCache[index]
 }
 
-func addUsernameToCache(clientId string, username string) {
-	clientUsernameCache[clientId] = username
+func addUsernameToCache(clientID string, username string) {
+	clientUsernameCache[clientID] = username
 }
 
-func getUsernameFromCache(clientId string) string {
+func getUsernameFromCache(clientID string) string {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	return clientUsernameCache[clientId]
+	return clientUsernameCache[clientID]
 }
 
 func resetUsernameCache() {
 	clientUsernameCache = make(map[string]string)
 }
 
-func setClientList(newClientList *ClientList) {
+func setClientList(newClientList *clientListStruct) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -125,7 +181,7 @@ func setClientList(newClientList *ClientList) {
 
 func cacheThisClient() {
 	for _, v := range clientList.Clients {
-		if v.ClientDbId == envVars.Id {
+		if v.ClientDbID == envVars.ID {
 			thisClient = v
 			return
 		}
@@ -136,7 +192,7 @@ func resetColorCache() {
 	clientColorCache = make(map[string]string)
 }
 
-func setClientId() string {
+func setClientID() string {
 	// if dev=true environment variable is set, use a random id
 	if os.Getenv("DEV") == "true" {
 		return uuid.New().String()
@@ -164,25 +220,25 @@ func setClientId() string {
 
 		log.Printf("new id generated and saved: %s", newID)
 		return newID
-	} else {
-		// id exists -> read id from file
-		id, err := os.ReadFile(idFilePath)
-		if err != nil {
-			log.Fatalf("error reading id: %v", err)
-		}
-
-		log.Printf("id was read from file: %s", string(id))
-		return string(id)
 	}
+
+	// id exists -> read id from file
+	id, err := os.ReadFile(idFilePath)
+	if err != nil {
+		log.Fatalf("error reading id: %v", err)
+	}
+
+	log.Printf("id was read from file: %s", string(id))
+	return string(id)
 }
 
 // getClientColor returns the color of the client with the given client id
 // return yellow if the client did not choose a color yet
-func getClientColor(clientId string) string {
+func getClientColor(clientID string) string {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	value, exists := clientColorCache[clientId]
+	value, exists := clientColorCache[clientID]
 
 	// if the color is already in the cache, return it; all good
 	if exists {
@@ -191,8 +247,8 @@ func getClientColor(clientId string) string {
 
 	// if the color is not in the cache, search for it in the client list and add it to the cache
 	for _, v := range clientList.Clients {
-		if v.ClientDbId == clientId && v.ClientColor != "" {
-			addClientColorToCache(clientId, v.ClientColor)
+		if v.ClientDbID == clientID && v.ClientColor != "" {
+			addClientColorToCache(clientID, v.ClientColor)
 			return v.ClientColor
 		}
 	}
@@ -205,11 +261,11 @@ func addClientColorToCache(id string, color string) {
 	clientColorCache[id] = color
 }
 
-func getUsernameForId(clientId string) string {
+func getUsernameForID(clientID string) string {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	value, exists := clientUsernameCache[clientId]
+	value, exists := clientUsernameCache[clientID]
 
 	// if the username is already in the cache, return it; all good
 	if exists {
@@ -218,8 +274,8 @@ func getUsernameForId(clientId string) string {
 
 	// if the username is not in the cache, search for it in the client list and add it to the cache
 	for _, v := range clientList.Clients {
-		if v.ClientDbId == clientId {
-			addUsernameToCache(clientId, v.ClientUsername)
+		if v.ClientDbID == clientID {
+			addUsernameToCache(clientID, v.ClientUsername)
 			return v.ClientUsername
 		}
 	}
@@ -228,6 +284,6 @@ func getUsernameForId(clientId string) string {
 	return "Unknown"
 }
 
-func getThisClientId() *string {
-	return &envVars.Id
+func getThisClientID() *string {
+	return &envVars.ID
 }
