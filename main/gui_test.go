@@ -178,7 +178,7 @@ func TestEvalTextInChatViewV3(t *testing.T) {
 		text string
 		want int
 	}{
-		{name: "MatchFound", text: "/sn Hello", want: 3},
+		{name: "MatchFound", text: "/sn233 Hello", want: 3},
 		{name: "MatchNotFound", text: "/shello", want: 0},
 		{name: "EmptyString", text: "", want: 0},
 		{name: "NumericContent", text: "/s123456", want: 0},
