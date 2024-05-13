@@ -55,6 +55,12 @@ type envVarsStruct struct {
 func addTypingClient(clientID string) {
 	mutex.Lock()
 	defer mutex.Unlock()
+
+	for _, v := range typingClientCache {
+		if v == clientID {
+			return
+		}
+	}
 	typingClientCache = append(typingClientCache, clientID)
 }
 
