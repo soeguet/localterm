@@ -289,7 +289,3 @@ func getUsernameForID(clientID string) string {
 	// if the username is not in the cache and not in the client list, return "Unknown"
 	return "Unknown"
 }
-
-func getThisClientID() *string {
-	return &envVars.ID
-}

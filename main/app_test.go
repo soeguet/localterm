@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"reflect"
 	"testing"
 
 	"github.com/gorilla/websocket"
@@ -110,18 +109,3 @@ func TestApp_desktopNotification(t *testing.T) {
 	}
 }
 
-func Test_createApp(t *testing.T) {
-	tests := []struct {
-		want *app
-		name string
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := createApp(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("createApp() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}

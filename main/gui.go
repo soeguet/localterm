@@ -25,16 +25,12 @@ const (
 )
 
 var (
-	textLabel  string
+	// textLabel  string
 	chatView   *tview.TextView
 	flex       tview.Flex
 	typingView *tview.TextView
 	inputField *tview.InputField
 )
-
-func (app *app) getTypingViewTextLabel() string {
-	return typingView.GetLabel()
-}
 
 func newApp(ui *tview.Application, conn *websocket.Conn) (*app, error) {
 	// initial request to websocket after handshake

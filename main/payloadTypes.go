@@ -47,10 +47,6 @@ type messageListRequestPayload struct {
 	PayloadType payloadType `json:"payloadType"`
 }
 
-type clientListRequestPayload struct {
-	PayloadType payloadType `json:"payloadType"`
-}
-
 type quoteType struct {
 	QuoteDbID           string `json:"quoteDbId"`
 	QuoteClientID       string `json:"quoteClientId"`

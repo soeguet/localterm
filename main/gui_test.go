@@ -237,33 +237,6 @@ func TestAtoi(t *testing.T) {
 	}
 }
 
-func Test_newApp(t *testing.T) {
-	type args struct {
-		ui   *tview.Application
-		conn *websocket.Conn
-	}
-	tests := []struct {
-		args    args
-		want    *app
-		name    string
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := newApp(tt.args.ui, tt.args.conn)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("newApp() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("newApp() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func Test_changeTextLabelText(t *testing.T) {
 	type args struct {
 		text string
