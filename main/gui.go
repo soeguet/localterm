@@ -2,6 +2,7 @@
 package main
 
 import (
+	"crypto/rand"
 	"encoding/base64"
 	"fmt"
 	"regexp"
@@ -419,7 +420,9 @@ func sendQuotedMessagePayloadToWebsocketV2(conn *websocket.Conn, message *string
 	messagePayload := messagePayload{
 		PayloadType: 1,
 		MessageType: messageType{
-			MessageDbID:    "TOBEREMOVED",
+			MessageDbID:    GenerateRandomID(),
+			Deleted:        false,
+			Edited:         false,
 			MessageContext: base64.StdEncoding.EncodeToString([]byte(trimmedMessage)),
 			MessageTime:    time.Now().Format("15:04"),
 			MessageDate:    time.Now().Format("2006-01-02"),
@@ -435,12 +438,19 @@ func sendQuotedMessagePayloadToWebsocketV2(conn *websocket.Conn, message *string
 			QuoteDate:           quotedMessagePayload.MessageType.MessageDate,
 		},
 		ReactionType: nil,
+		ImageType:    nil,
 	}
 
 	err := conn.WriteJSON(messagePayload)
 	if err != nil {
 		fmt.Println("Error writing messagePayload:", err)
 	}
+}
+
+func GenerateRandomID() string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	return base64.StdEncoding.EncodeToString(b)
 }
 
 func sendQuotedMessagePayloadToWebsocket(conn *websocket.Conn, message *string) {
@@ -455,7 +465,9 @@ func sendQuotedMessagePayloadToWebsocket(conn *websocket.Conn, message *string) 
 	messagePayload := messagePayload{
 		PayloadType: 1,
 		MessageType: messageType{
-			MessageDbID:    "TOBEREMOVED",
+			MessageDbID:    GenerateRandomID(),
+			Deleted:        false,
+			Edited:         false,
 			MessageContext: base64.StdEncoding.EncodeToString([]byte(trimmedMessage)),
 			MessageTime:    time.Now().Format("15:04"),
 			MessageDate:    time.Now().Format("2006-01-02"),
@@ -471,6 +483,7 @@ func sendQuotedMessagePayloadToWebsocket(conn *websocket.Conn, message *string) 
 			QuoteDate:           quotedMessagePayload.MessageType.MessageDate,
 		},
 		ReactionType: nil,
+		ImageType:    nil,
 	}
 
 	err := conn.WriteJSON(messagePayload)

@@ -15,21 +15,28 @@ type app struct {
 }
 
 type messageListPayload struct {
-	PayloadType payloadType      `json:"payloadType"`
 	MessageList []messagePayload `json:"messageList"`
+	PayloadType payloadType      `json:"payloadType"`
 }
 
 type genericMessage struct {
-	PayloadType payloadType     `json:"payloadType"`
 	Payload     json.RawMessage `json:"payload"`
+	PayloadType payloadType     `json:"payloadType"`
 }
 
 type messagePayload struct {
-	PayloadType  payloadType     `json:"payloadType"`
-	MessageType  messageType     `json:"messageType"`
-	ClientType   clientType      `json:"clientType"`
 	QuoteType    *quoteType      `json:"quoteType"`
 	ReactionType *[]reactionType `json:"reactionType"`
+	ImageType    *imageType      `json:"imageType"`
+	ClientType   clientType      `json:"clientType"`
+	MessageType  messageType     `json:"messageType"`
+	PayloadType  payloadType     `json:"payloadType"`
+}
+
+type imageType struct {
+	ImageDbID string `json:"imageDbId"`
+	Type      string `json:"type"`
+	Data      string `json:"data"`
 }
 
 type messageType struct {
@@ -37,6 +44,8 @@ type messageType struct {
 	MessageContext string `json:"messageContext"`
 	MessageTime    string `json:"messageTime"`
 	MessageDate    string `json:"messageDate"`
+	Deleted        bool   `json:"deleted"`
+	Edited         bool   `json:"edited"`
 }
 
 type clientType struct {
@@ -62,29 +71,29 @@ type reactionType struct {
 }
 
 type reactionPayload struct {
-	PayloadType       payloadType `json:"payloadType"`
 	ReactionDbID      string      `json:"reactionDbId"`
 	ReactionMessageID string      `json:"reactionMessageId"`
 	ReactionContext   string      `json:"reactionContext"`
 	ReactionClientID  string      `json:"reactionClientId"`
+	PayloadType       payloadType `json:"payloadType"`
 }
 
 type typingPayload struct {
-	PayloadType payloadType `json:"payloadType"`
 	ClientDbID  string      `json:"clientDbId"`
+	PayloadType payloadType `json:"payloadType"`
 	IsTyping    bool        `json:"isTyping"`
 }
 
 type authenticationPayload struct {
-	PayloadType    payloadType `json:"payloadType"`
 	ClientUsername string      `json:"clientUsername"`
 	ClientDbID     string      `json:"clientDbId"`
+	PayloadType    payloadType `json:"payloadType"`
 }
 
 type clientUpdatePayload struct {
-	PayloadType        payloadType `json:"payloadType"`
 	ClientDbID         string      `json:"clientDbId"`
 	ClientUsername     string      `json:"clientUsername"`
 	ClientColor        string      `json:"clientColor"`
 	ClientProfileImage string      `json:"clientProfileImage"`
+	PayloadType        payloadType `json:"payloadType"`
 }

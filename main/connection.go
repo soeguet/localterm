@@ -203,8 +203,10 @@ func sendMessagePayloadToWebsocket(conn *websocket.Conn, message *string) {
 	messagePayload := messagePayload{
 		PayloadType: messageTypeConst,
 		MessageType: messageType{
-			MessageDbID:    "TOBEREMOVED",
+			MessageDbID:    GenerateRandomID(),
 			MessageContext: base64.StdEncoding.EncodeToString([]byte(*message)),
+			Deleted:        false,
+			Edited:         false,
 			MessageTime:    time.Now().Format("15:04"),
 			MessageDate:    time.Now().Format("2006-01-02"),
 		},
